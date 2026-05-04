@@ -8,3 +8,7 @@ export {
   beginPasskeyRegistration,
   finishPasskeyRegistration,
 } from "./flows/passkey-register.js";
+export {
+  beginPasskeySignIn,
+  finishPasskeySignIn,
+} from "./flows/passkey-signin.js";

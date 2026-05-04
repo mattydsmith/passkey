@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { beginPasskeyRegistration } from "../src/flows/passkey-register.js";
+import { beginPasskeySignIn } from "../src/flows/passkey-signin.js";
 import { createHarness, type Harness } from "./setup.js";
 
 describe("beginPasskeyRegistration", () => {
@@ -48,5 +49,22 @@ describe("beginPasskeyRegistration", () => {
       userVerification: "preferred",
     });
     expect(result.registrationId).toMatch(/^reg_/);
+  });
+});
+
+describe("beginPasskeySignIn", () => {
+  let h: Harness;
+  beforeEach(() => { h = createHarness(); });
+
+  it("returns options with rpId, challenge, empty allowCredentials", async () => {
+    const result = await beginPasskeySignIn({
+      db: h.db, deps: h.deps,
+      rpId: "example.com",
+      userVerification: "preferred",
+    });
+    expect(result.options.rpId).toBe("example.com");
+    expect(typeof result.options.challenge).toBe("string");
+    expect(result.options.allowCredentials).toEqual([]);
+    expect(result.signInId).toMatch(/^auth_/);
   });
 });
