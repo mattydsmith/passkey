@@ -75,4 +75,20 @@ test("full flow: email OTP → register passkey → sign-out → sign-in with pa
   // /me again — back in
   await page.locator("#btn-me").click();
   await expect.poll(() => readStatus(page)).toContain("getCurrentUser");
+
+  // listPasskeys returns the registered credential
+  await page.locator("#btn-passkeys").click();
+  await expect.poll(() => readStatus(page)).toContain("listPasskeys");
+  expect(await readStatus(page)).toContain("Demo browser");
+
+  // Delete the passkey using the id returned by registerPasskey —
+  // this validates that registerPasskey's id round-trips through deletePasskey
+  await page.locator("#btn-delete").click();
+  await expect.poll(() => readStatus(page)).toContain("deletePasskey");
+  expect(await readStatus(page)).toContain("ok");
+
+  // listPasskeys is now empty
+  await page.locator("#btn-passkeys").click();
+  await expect.poll(() => readStatus(page)).toContain("listPasskeys");
+  expect(await readStatus(page)).toContain('"passkeys": []');
 });

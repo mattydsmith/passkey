@@ -89,3 +89,12 @@ $("btn-passkeys").addEventListener("click", async () => {
     }
   } catch (e) { show("listPasskeys", e); }
 });
+
+$("btn-delete").addEventListener("click", async () => {
+  try {
+    if (!pendingPasskeyId) return show("deletePasskey", "no pending passkeyId");
+    await client.deletePasskey(pendingPasskeyId);
+    show("deletePasskey", `ok (${pendingPasskeyId})`);
+    pendingPasskeyId = null;
+  } catch (e) { show("deletePasskey", e); }
+});
