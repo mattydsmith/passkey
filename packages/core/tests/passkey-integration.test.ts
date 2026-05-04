@@ -126,7 +126,7 @@ describe("passkey registration (integration)", () => {
       deviceName: "Test Device",
     });
 
-    expect(result.passkeyId).toMatch(/^pk_/);
+    expect(result.passkeyId).toBe(CRED_ID_BASE64URL);
 
     // Verify the passkey was stored with correct deviceName
     const stored = auth.listPasskeys({ userId: "u_1" });

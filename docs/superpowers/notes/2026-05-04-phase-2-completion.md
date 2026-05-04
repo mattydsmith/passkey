@@ -178,22 +178,22 @@ createAuthClient(config: AuthClientConfig): AuthClient
 - `baseUrl: string`
 - `storage: "cookie" | "header"`
 - `fetch?: typeof fetch`
-- `storageKey?: string` (header mode only — defaults to `auth.session-token`)
+- `storageKey?: string` (header mode only — defaults to `passkey-sdk:session`)
 - `csrfCookieName?: string` (cookie mode only — defaults to `csrf`)
 
 `AuthClient` methods (the names the Swift client should mirror where possible):
 
 | Method | Server route | Auth required |
 |---|---|---|
-| `startEmailSignIn({ email })` | `POST /auth/email/start` | no |
-| `verifyEmailOtp({ otpId, code })` | `POST /auth/email/verify` | no (issues session) |
-| `registerPasskey({ deviceName? })` | `POST /auth/passkey/register/{start,finish}` | yes |
+| `startEmailSignIn(email: string)` | `POST /auth/email/start` | no |
+| `verifyEmailOtp(otpId: string, code: string)` | `POST /auth/email/verify` | no (issues session) |
+| `registerPasskey(opts?: { deviceName?: string })` | `POST /auth/passkey/register/{start,finish}` | yes |
 | `signInWithPasskey()` | `POST /auth/passkey/sign-in/{start,finish}` | no (issues session) |
 | `getCurrentUser()` | `GET /auth/me` | yes |
 | `signOut()` | `POST /auth/sign-out` | yes |
 | `listSessions()` | `GET /auth/sessions` | yes |
 | `listPasskeys()` | `GET /auth/passkeys` | yes |
-| `deletePasskey({ id })` | `DELETE /auth/passkeys/:id` | yes |
+| `deletePasskey(id: string)` | `DELETE /auth/passkeys/:id` | yes |
 
 The two passkey ceremonies are **two-step** — `start` returns `{ id, options }`, the client runs `navigator.credentials.{create,get}()`, then `finish` posts the encoded credential plus the ceremony id. Swift's `ASAuthorizationController` flow maps onto the same two steps.
 

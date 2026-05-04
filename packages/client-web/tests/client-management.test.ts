@@ -20,7 +20,7 @@ const server = setupServer(
     HttpResponse.json({
       passkeys: [
         {
-          id: "pk_1",
+          id: "Y3JlZF9hYmMxMjM",
           deviceName: "MacBook",
           createdAt: 100,
           lastUsedAt: 200,
@@ -57,7 +57,7 @@ describe("listPasskeys", () => {
   it("returns the passkeys array", async () => {
     const client = createAuthClient({ baseUrl: BASE, storage: "header" });
     const out = await client.listPasskeys();
-    expect(out.passkeys[0].id).toBe("pk_1");
+    expect(out.passkeys[0].id).toBe("Y3JlZF9hYmMxMjM");
     expect(out.passkeys[0].transports).toEqual(["internal"]);
   });
 });

@@ -145,5 +145,5 @@ export async function finishPasskeyRegistration(
     lastUsedAt: null,
   });
 
-  return { passkeyId: `pk_${credentialId}` };
+  return { passkeyId: credentialId };
 }

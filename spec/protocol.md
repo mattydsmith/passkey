@@ -73,6 +73,8 @@ Request: `{ "registrationId": string, "credential": <attestation>, "deviceName"?
 Response 200: `{ "passkeyId": string }`
 Errors: `invalid_credential` (401), `unauthenticated` (401).
 
+`passkeyId` is the credential ID encoded as base64url — the same value returned as `id` from `GET /auth/passkeys` and accepted as the path parameter on `DELETE /auth/passkeys/:id`. Clients can pass `passkeyId` straight to `DELETE` without transformation.
+
 ### POST /auth/passkey/sign-in/start
 
 Begin passkey sign-in. No authentication required (this is how you sign in).
