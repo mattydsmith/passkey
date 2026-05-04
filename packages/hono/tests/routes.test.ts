@@ -112,6 +112,41 @@ describe("mountAuthRoutes — email OTP", () => {
     expect(setCookie).toMatch(/Max-Age=3600/);
   });
 
+  it("session cookie is not Secure on plain HTTP", async () => {
+    const { app, sentOtps } = buildApp();
+    const start = await app.request("/auth/email/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "matt@example.com" }),
+    });
+    const { otpId } = await start.json();
+    const verify = await app.request("/auth/email/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ otpId, code: sentOtps[0]!.code }),
+    });
+    const setCookie = verify.headers.get("set-cookie") ?? "";
+    expect(setCookie).not.toMatch(/;\s*Secure/);
+  });
+
+  it("session and csrf cookies are Secure when X-Forwarded-Proto is https", async () => {
+    const { app, sentOtps } = buildApp();
+    const start = await app.request("/auth/email/start", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-proto": "https" },
+      body: JSON.stringify({ email: "matt@example.com" }),
+    });
+    const { otpId } = await start.json();
+    const verify = await app.request("/auth/email/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-proto": "https" },
+      body: JSON.stringify({ otpId, code: sentOtps[0]!.code }),
+    });
+    const setCookie = verify.headers.get("set-cookie") ?? "";
+    // Both session and csrf cookies should carry Secure
+    expect(setCookie.match(/Secure/g)?.length).toBe(2);
+  });
+
   it("POST /auth/email/verify with bad code returns 401 invalid_otp", async () => {
     const { app } = buildApp();
     const start = await app.request("/auth/email/start", {

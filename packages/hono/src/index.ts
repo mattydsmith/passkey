@@ -44,6 +44,12 @@ function errorResponse(c: any, err: unknown) {
   return c.json({ error: "internal_error", message: "Internal error" }, 500);
 }
 
+function isHttps(c: any): boolean {
+  if (c.req.header("x-forwarded-proto") === "https") return true;
+  const url = c.req.url as string | undefined;
+  return typeof url === "string" && url.startsWith("https://");
+}
+
 function setSessionCookie(c: any, token: string, lifetimeSeconds: number, cookieName: string) {
   const parts = [
     `${cookieName}=${encodeURIComponent(token)}`,
@@ -52,6 +58,7 @@ function setSessionCookie(c: any, token: string, lifetimeSeconds: number, cookie
     `HttpOnly`,
     `SameSite=Lax`,
   ];
+  if (isHttps(c)) parts.push("Secure");
   c.header("set-cookie", parts.join("; "));
 }
 
@@ -77,6 +84,7 @@ export function mountAuthRoutes(app: Hono, auth: Auth, opts: MountOptions = {}) 
       `Max-Age=${sessionLifetime}`,
       `SameSite=Lax`,
     ];
+    if (isHttps(c)) parts.push("Secure");
     c.header("set-cookie", parts.join("; "), { append: true });
     return token;
   }
