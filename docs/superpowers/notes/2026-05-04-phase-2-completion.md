@@ -269,3 +269,21 @@ New in Phase 2:
 4. `Passkey/packages/client-web/src/webauthn.ts` — base64url codec + ceremony wrapper. Swift's `AuthenticationServices` mapping mirrors this 1:1, including the JSON shape posted to `/finish`.
 5. `Passkey/packages/client-web/src/client.ts` — public façade pattern (method names, two-step ceremonies, error mapping).
 6. `Passkey/examples/hono-app/src/index.ts` — server the iOS demo will also talk to. (Same example, two clients.)
+
+---
+
+## Phase 2.1 follow-ups (also 2026-05-04)
+
+After the cross-cutting code review, five small fixes landed before declaring Phase 2 done. Test count is now **148** (59 core + 26 hono + 59 client-web + 3 hono-app + 1 Playwright e2e). The total commit count from Phase 1 completion (`e55c515`) to this stage is **24**.
+
+| # | Fix | Commit |
+|---|---|---|
+| 1 | Server 500 fallback emits `internal_error` (was `rate_limited` — misleading). New code added to spec + client error union. | `656050f` |
+| 2 | `Secure` cookie attribute auto-set on session + csrf cookies when `X-Forwarded-Proto: https` or the request URL is HTTPS. | `2caf73e` |
+| 3 | `examples/web-demo` gains a Delete Passkey button; Playwright e2e extended to register → list → delete → list (empty). Locks the cross-cutting `passkeyId` shape fix end-to-end. | `708c81a` |
+| 4 | `dist/` duplicate-suffixed artifacts cleaned (gitignored, no commit). tsup's `clean: true` keeps them gone. | — |
+| 5 | `/__test/last-otp` route registration gated at module load by `NODE_ENV=test` (don't even mount it in production). Inner request-time check kept as defense-in-depth. | `0d7f20e` |
+
+These were prefaced by the Phase 2 cross-cutting review's fixes (commit `f99a96a`): the `passkeyId` shape unification, the completion-notes API-signature corrections, and the `transport.test.ts` `afterEach(server.resetHandlers())` patch.
+
+Phase 3 (Swift) inherits a clean main with no open `Phase 2` items.

@@ -1,7 +1,147 @@
 # Passkey SDK
 
-Email OTP + passkey authentication for personal projects. Self-contained,
-SQLite-backed, multi-platform.
+Email-OTP + passkey authentication for personal projects. Self-contained, SQLite-backed, multi-platform. One npm install (or Swift Package add) and a few lines of config to drop passwordless auth into a project — no external auth service required at runtime.
 
-See `docs/superpowers/specs/` for design and `docs/superpowers/plans/` for
-implementation plans.
+The defining constraint is **multi-platform from day one**: a single project's backend can serve both a web client and a native Apple-platform client, both of which register and authenticate passkeys against the same user accounts.
+
+## Status
+
+- **Phase 1 — TypeScript server:** shipped (`packages/core`, `packages/hono`, `packages/cli`).
+- **Phase 2 — Web client:** shipped (`packages/client-web`) plus cookie-mode prerequisites on the server (CSRF middleware, `Secure` cookies, threaded `Max-Age`).
+- **Phase 3 — Swift / iOS client:** planned.
+
+The HTTP contract at [`spec/protocol.md`](spec/protocol.md) is the durable artifact every package implements or consumes.
+
+Nothing is published to npm yet. This is a personal SDK consumed via workspace links.
+
+## Packages
+
+| Package | Description |
+|---|---|
+| [`@mattsmith/passkey-sdk-core`](packages/core) | Server: pure TS — email OTP, WebAuthn ceremonies, sessions, SQLite storage. No HTTP. |
+| [`@mattsmith/passkey-sdk-hono`](packages/hono) | Server: Hono adapter — mounts `/auth/*` routes, CSRF middleware, cookie issuance. |
+| [`@mattsmith/passkey-sdk-cli`](packages/cli) | Server: `passkey-sdk migrate <db>` for running schema migrations. |
+| [`@mattsmith/passkey-sdk-client-web`](packages/client-web) | Browser client: `fetch` + `navigator.credentials` wrapper, typed errors, cookie/header session modes. |
+
+## Examples
+
+| Example | Description |
+|---|---|
+| [`examples/hono-app`](examples/hono-app) | Reference server using the Hono adapter. Console-logs OTPs in dev. |
+| [`examples/web-demo`](examples/web-demo) | Vite app exercising every public method of the web client. Has a Playwright e2e with a Chromium WebAuthn virtual authenticator. |
+
+## Quick start
+
+### Server (Hono)
+
+```ts
+import Database from "better-sqlite3";
+import { Hono } from "hono";
+import { createAuth, runMigrations } from "@mattsmith/passkey-sdk-core";
+import { mountAuthRoutes } from "@mattsmith/passkey-sdk-hono";
+
+const db = new Database("./app.db");
+runMigrations(db);
+
+const auth = createAuth({
+  rpId: "example.com",
+  origins: ["https://app.example.com"],
+  session: { lifetimeSeconds: 60 * 60 * 24 * 30, cookieName: "session" },
+  email: {
+    sendOtp: async ({ to, code }) => {
+      // BYO transport — Resend, SES, console.log in dev, etc.
+    },
+  },
+  users: {
+    findOrCreateByEmail: async (email) => {
+      // Project owns the users table. Return a user_id.
+    },
+  },
+}, { db });
+
+const app = new Hono();
+mountAuthRoutes(app, auth);   // CSRF middleware + cookies are default-on
+```
+
+### Web client
+
+```ts
+import { createAuthClient } from "@mattsmith/passkey-sdk-client-web";
+
+const client = createAuthClient({
+  baseUrl: "https://api.example.com/auth",
+  storage: "cookie",   // or "header" for bearer-token mode
+});
+
+const { otpId } = await client.startEmailSignIn("matt@example.com");
+const { user } = await client.verifyEmailOtp(otpId, "482917");
+
+await client.registerPasskey({ deviceName: "MacBook" });
+const { user: signedIn } = await client.signInWithPasskey();
+
+await client.signOut();
+```
+
+## Repository layout
+
+```
+Passkey/
+├── spec/protocol.md              # The HTTP contract — source of truth
+├── packages/
+│   ├── core/                     # Server: pure functions, no HTTP
+│   ├── hono/                     # Server: Hono adapter
+│   ├── cli/                      # Server: migration CLI
+│   └── client-web/               # Browser client
+├── examples/
+│   ├── hono-app/                 # Reference server
+│   └── web-demo/                 # Reference web client + Playwright e2e
+└── docs/superpowers/
+    ├── specs/                    # Design specs
+    ├── plans/                    # Implementation plans
+    └── notes/                    # Per-phase completion notes
+```
+
+## Development
+
+```bash
+pnpm install         # idempotent
+pnpm build           # builds all four packages
+pnpm typecheck       # tsc --noEmit across all packages
+pnpm test            # runs vitest in core + hono + client-web
+```
+
+Per-example tests:
+
+```bash
+pnpm --filter hono-app-example test     # 3 tests (server e2e via app.request)
+pnpm --filter web-demo-example test     # Playwright e2e (needs port 3001 free; uses NODE_ENV=test internally)
+```
+
+Run the reference server:
+
+```bash
+( cd examples/hono-app && pnpm migrate )    # creates ./app.db
+( cd examples/hono-app && pnpm dev )        # listens on :3000, OTPs printed to stdout
+```
+
+Run the reference web demo (talks to `examples/hono-app`):
+
+```bash
+( cd examples/hono-app && pnpm dev )        # in one terminal
+( cd examples/web-demo && pnpm dev )        # in another, listens on :5173
+```
+
+## Conventions
+
+- Node ≥20, ESM-only, `NodeNext` module resolution.
+- TypeScript `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`.
+- Each package has one clear purpose and a small public surface.
+- `core` knows nothing about HTTP; the Hono adapter is thin.
+- The web client has no runtime dependencies — only `fetch`, `navigator.credentials`, `localStorage`, `document.cookie`.
+
+## Further reading
+
+- [`spec/protocol.md`](spec/protocol.md) — the HTTP contract (errors, CSRF, every endpoint)
+- [`docs/superpowers/specs/2026-05-03-passkey-sdk-design.md`](docs/superpowers/specs/2026-05-03-passkey-sdk-design.md) — overall design
+- [`docs/superpowers/notes/2026-05-04-phase-1-completion.md`](docs/superpowers/notes/2026-05-04-phase-1-completion.md) — Phase 1 server handoff
+- [`docs/superpowers/notes/2026-05-04-phase-2-completion.md`](docs/superpowers/notes/2026-05-04-phase-2-completion.md) — Phase 2 web-client handoff
