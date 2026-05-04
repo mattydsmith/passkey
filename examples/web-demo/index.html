@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Passkey SDK Web Demo</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+      section { margin-bottom: 1.5rem; padding: 1rem; border: 1px solid #ddd; border-radius: 6px; }
+      input, button { font-size: 1rem; padding: 0.4rem 0.6rem; margin: 0.2rem 0.2rem 0.2rem 0; }
+      pre { background: #f4f4f4; padding: 0.5rem; overflow: auto; }
+    </style>
+  </head>
+  <body>
+    <h1>Passkey SDK Web Demo</h1>
+
+    <section>
+      <h2>Email OTP</h2>
+      <input id="email" type="email" placeholder="you@example.com" />
+      <button id="btn-start">Send OTP</button>
+      <input id="otp" type="text" placeholder="6-digit code" />
+      <button id="btn-verify">Verify OTP</button>
+    </section>
+
+    <section>
+      <h2>Passkey</h2>
+      <button id="btn-register">Register Passkey</button>
+      <button id="btn-signin">Sign in with Passkey</button>
+    </section>
+
+    <section>
+      <h2>Session</h2>
+      <button id="btn-me">Get Current User</button>
+      <button id="btn-signout">Sign Out</button>
+      <button id="btn-sessions">List Sessions</button>
+      <button id="btn-passkeys">List Passkeys</button>
+    </section>
+
+    <section>
+      <h2>Status</h2>
+      <pre id="out">(no output yet)</pre>
+    </section>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
