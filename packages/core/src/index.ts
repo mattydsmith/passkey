@@ -14,3 +14,4 @@ export {
 } from "./flows/passkey-signin.js";
 export { appleAppSiteAssociation } from "./aasa.js";
 export { cleanup } from "./cleanup.js";
+export { createAuth, type Auth } from "./auth.js";
