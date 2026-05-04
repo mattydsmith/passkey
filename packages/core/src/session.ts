@@ -75,7 +75,7 @@ export function validateAndBumpSession(args: {
   const row = getSessionByTokenHash(db, tokenHash);
   const now = deps.now();
   if (!row || row.expiresAt <= now) {
-    throw new AuthError("unauthenticated", "unauthenticated");
+    throw new AuthError("unauthenticated", "Session is missing or expired");
   }
   bumpSessionLastSeen(db, tokenHash, now);
   return { userId: row.userId, expiresAt: row.expiresAt };

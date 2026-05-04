@@ -70,7 +70,7 @@ describe("session lifecycle", () => {
     h.clock.now += 200;
     expect(() =>
       validateAndBumpSession({ db: h.db, deps: h.deps, sessionToken })
-    ).toThrow(/unauthenticated/i);
+    ).toThrow(/missing or expired/i);
   });
 
   it("revokeSession deletes the row", async () => {
