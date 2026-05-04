@@ -74,7 +74,7 @@ public struct KeychainStorage: TokenStorage {
 
     public func save(_ token: String) throws {
         let data = Data(token.utf8)
-        var query = baseQuery()
+        let query = baseQuery()
         let attrs: [String: Any] = [
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,

@@ -10,7 +10,7 @@ public protocol AuthenticationServicesProvider: Sendable {
 
 /// Production implementation. Wraps ASAuthorizationController in async/await.
 public final class DefaultAuthenticationServicesProvider: NSObject, AuthenticationServicesProvider, ASAuthorizationControllerDelegate, @unchecked Sendable {
-    public override init() {
+    public override nonisolated init() {
         super.init()
     }
 
