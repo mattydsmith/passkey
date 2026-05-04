@@ -79,6 +79,39 @@ describe("mountAuthRoutes — email OTP", () => {
     expect(res.headers.get("set-cookie")).toContain("session=");
   });
 
+  it("POST /auth/email/verify Max-Age matches config.session.lifetimeSeconds", async () => {
+    const db = new Database(":memory:");
+    runMigrations(db);
+    const sentOtps: { to: string; code: string }[] = [];
+    const auth = createAuth(
+      {
+        rpId: "example.com",
+        origins: ["https://app.example.com"],
+        session: { lifetimeSeconds: 3600, cookieName: "session" },
+        email: { sendOtp: async (a) => { sentOtps.push(a); } },
+        users: {
+          findOrCreateByEmail: async () => "u_x",
+        },
+      },
+      { db, deps: defaultDeps }
+    );
+    const app = new Hono();
+    mountAuthRoutes(app, auth);
+    const start = await app.request("/auth/email/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "matt@example.com" }),
+    });
+    const { otpId } = await start.json();
+    const verify = await app.request("/auth/email/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ otpId, code: sentOtps[0]!.code }),
+    });
+    const setCookie = verify.headers.get("set-cookie") ?? "";
+    expect(setCookie).toMatch(/Max-Age=3600/);
+  });
+
   it("POST /auth/email/verify with bad code returns 401 invalid_otp", async () => {
     const { app } = buildApp();
     const start = await app.request("/auth/email/start", {

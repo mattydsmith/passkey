@@ -53,8 +53,8 @@ function setSessionCookie(c: any, token: string, lifetimeSeconds: number, cookie
 
 export function mountAuthRoutes(app: Hono, auth: Auth, opts: MountOptions = {}) {
   const prefix = opts.prefix ?? "/auth";
-  const sessionLifetime = 60 * 60 * 24 * 30;
-  const cookieName = "session";
+  const sessionLifetime = auth.config.session.lifetimeSeconds;
+  const cookieName = auth.config.session.cookieName ?? "session";
 
   app.post(`${prefix}/email/start`, async (c) => {
     try {

@@ -70,6 +70,7 @@ export function createAuth(config: AuthConfig, runtime: AuthRuntime) {
   }
 
   return {
+    config,
     async startEmailOtp(input: { email: string }): Promise<OtpStartResult> {
       return startEmailOtp({
         db, deps,
