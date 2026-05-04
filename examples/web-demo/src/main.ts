@@ -1,7 +1,7 @@
 import { createAuthClient, AuthClientError } from "@mattsmith/passkey-sdk-client-web";
 
 const client = createAuthClient({
-  baseUrl: "http://127.0.0.1:3000/auth",
+  baseUrl: "/auth",
   storage: "cookie",
 });
 

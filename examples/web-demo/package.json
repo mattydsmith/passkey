@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 5173 --host 127.0.0.1",
+    "dev": "vite --port 5173 --host localhost",
     "build": "vite build",
-    "preview": "vite preview --port 5173 --host 127.0.0.1",
+    "preview": "vite preview --port 5173 --host localhost",
     "test": "playwright test"
   },
   "dependencies": {

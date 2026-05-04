@@ -22,8 +22,12 @@ const lastOtps = new Map<string, string>();
 
 const auth = createAuth(
   {
-    rpId: "127.0.0.1",
-    origins: ["http://127.0.0.1:5173", "http://127.0.0.1:3000"],
+    rpId: "localhost",
+    origins: [
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "http://localhost:3001",
+    ],
     session: { lifetimeSeconds: 60 * 60 * 24 * 30, cookieName: "session" },
     email: {
       sendOtp: async ({ to, code }) => {
