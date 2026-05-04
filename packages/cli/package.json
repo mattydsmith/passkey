@@ -1,0 +1,23 @@
+{
+  "name": "@mattsmith/passkey-sdk-cli",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": { "passkey-sdk": "./dist/index.js" },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "test": "echo 'no tests'",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mattsmith/passkey-sdk-core": "workspace:*",
+    "better-sqlite3": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  }
+}
