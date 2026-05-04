@@ -13,6 +13,8 @@ import type {
   GetCurrentUserResult,
   RegisterPasskeyResult,
   SignInWithPasskeyResult,
+  ListSessionsResult,
+  ListPasskeysResult,
 } from "./types.js";
 
 export interface AuthClient {
@@ -22,6 +24,9 @@ export interface AuthClient {
   signInWithPasskey(): Promise<SignInWithPasskeyResult>;
   getCurrentUser(): Promise<GetCurrentUserResult>;
   signOut(): Promise<void>;
+  listSessions(): Promise<ListSessionsResult>;
+  listPasskeys(): Promise<ListPasskeysResult>;
+  deletePasskey(id: string): Promise<void>;
 }
 
 export function createAuthClient(config: AuthClientConfig): AuthClient {
@@ -91,6 +96,20 @@ export function createAuthClient(config: AuthClientConfig): AuthClient {
     async signOut() {
       await transport.request<{ ok: true }>("/sign-out", { method: "POST" });
       storage.clear();
+    },
+
+    async listSessions() {
+      return transport.request<ListSessionsResult>("/sessions", { method: "GET" });
+    },
+
+    async listPasskeys() {
+      return transport.request<ListPasskeysResult>("/passkeys", { method: "GET" });
+    },
+
+    async deletePasskey(id) {
+      await transport.request<{ ok: true }>(`/passkeys/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
     },
   };
 }
