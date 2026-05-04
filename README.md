@@ -8,7 +8,7 @@ The defining constraint is **multi-platform from day one**: a single project's b
 
 - **Phase 1 — TypeScript server:** shipped (`packages/core`, `packages/hono`, `packages/cli`).
 - **Phase 2 — Web client:** shipped (`packages/client-web`) plus cookie-mode prerequisites on the server (CSRF middleware, `Secure` cookies, threaded `Max-Age`).
-- **Phase 3 — Swift / iOS client:** planned.
+- **Phase 3 — Swift / iOS client:** shipped (`clients/PasskeySDK`) plus a SwiftUI demo (`clients/ios-demo`).
 
 The HTTP contract at [`spec/protocol.md`](spec/protocol.md) is the durable artifact every package implements or consumes.
 
@@ -22,6 +22,7 @@ Nothing is published to npm yet. This is a personal SDK consumed via workspace l
 | [`@mattsmith/passkey-sdk-hono`](packages/hono) | Server: Hono adapter — mounts `/auth/*` routes, CSRF middleware, cookie issuance. |
 | [`@mattsmith/passkey-sdk-cli`](packages/cli) | Server: `passkey-sdk migrate <db>` for running schema migrations. |
 | [`@mattsmith/passkey-sdk-client-web`](packages/client-web) | Browser client: `fetch` + `navigator.credentials` wrapper, typed errors, cookie/header session modes. |
+| [`PasskeySDK`](clients/PasskeySDK) (Swift) | Native iOS / macOS client: `URLSession` + `AuthenticationServices` + Keychain. Bearer-mode only. |
 
 ## Examples
 
@@ -29,6 +30,7 @@ Nothing is published to npm yet. This is a personal SDK consumed via workspace l
 |---|---|
 | [`examples/hono-app`](examples/hono-app) | Reference server using the Hono adapter. Console-logs OTPs in dev. |
 | [`examples/web-demo`](examples/web-demo) | Vite app exercising every public method of the web client. Has a Playwright e2e with a Chromium WebAuthn virtual authenticator. |
+| [`clients/ios-demo`](clients/ios-demo) | SwiftUI app exercising every public method of `PasskeySDK`. Manual run target. |
 
 ## Quick start
 
@@ -92,6 +94,9 @@ Passkey/
 │   ├── hono/                     # Server: Hono adapter
 │   ├── cli/                      # Server: migration CLI
 │   └── client-web/               # Browser client
+├── clients/
+│   ├── PasskeySDK/               # Swift Package — native iOS / macOS client
+│   └── ios-demo/                 # SwiftUI demo
 ├── examples/
 │   ├── hono-app/                 # Reference server
 │   └── web-demo/                 # Reference web client + Playwright e2e
