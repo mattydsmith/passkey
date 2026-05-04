@@ -53,6 +53,59 @@ public struct AuthClient: Sendable {
         let _: EmptyResponse = try await transport.request(path: "/sign-out", method: .post, body: nil)
         try storage.clear()
     }
+
+    // MARK: - Passkey
+
+    public func registerPasskey(deviceName: String? = nil) async throws -> RegisterPasskeyResult {
+        struct StartResponse: Decodable {
+            let registrationId: String
+            let options: ServerCreationOptions
+        }
+        let start: StartResponse = try await transport.request(
+            path: "/passkey/register/start",
+            method: .post,
+            body: nil
+        )
+        let credential = try await webauthn.performRegistration(opts: start.options)
+
+        var body: [String: Any] = [
+            "registrationId": start.registrationId,
+            "credential": credential.asJSONObject(),
+        ]
+        if let deviceName {
+            body["deviceName"] = deviceName
+        }
+        return try await transport.request(
+            path: "/passkey/register/finish",
+            method: .post,
+            body: AnyJSONObject(body)
+        )
+    }
+
+    public func signInWithPasskey() async throws -> SignInWithPasskeyResult {
+        struct StartResponse: Decodable {
+            let signInId: String
+            let options: ServerRequestOptions
+        }
+        let start: StartResponse = try await transport.request(
+            path: "/passkey/sign-in/start",
+            method: .post,
+            body: nil
+        )
+        let credential = try await webauthn.performSignIn(opts: start.options)
+
+        let body: [String: Any] = [
+            "signInId": start.signInId,
+            "credential": credential.asJSONObject(),
+        ]
+        let wire: SignInWithPasskeyWireResponse = try await transport.request(
+            path: "/passkey/sign-in/finish",
+            method: .post,
+            body: AnyJSONObject(body)
+        )
+        try storage.save(wire.sessionToken)
+        return SignInWithPasskeyResult(user: wire.user)
+    }
 }
 
 /// Wire-only response shape for endpoints that issue a session token. The
@@ -65,4 +118,50 @@ struct VerifyEmailOtpWireResponse: Decodable {
 struct SignInWithPasskeyWireResponse: Decodable {
     let sessionToken: String
     let user: AuthUser
+}
+
+/// Encodable wrapper for [String: Any] that uses JSONSerialization to
+/// preserve nil-omission behavior. Only allows JSON-compatible values.
+struct AnyJSONObject: Encodable {
+    let object: [String: Any]
+
+    init(_ object: [String: Any]) {
+        self.object = object
+    }
+
+    func encode(to encoder: Encoder) throws {
+        // Bridge through JSONSerialization to handle [String: Any] which
+        // standard Encodable can't.
+        let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+        // Re-decode into a generic JSON value tree and re-encode through the
+        // standard Encoder so JSONEncoder's keyEncoding / dateEncoding (none
+        // configured here) apply consistently.
+        let json = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+        try AnyJSONValue(value: json).encode(to: encoder)
+    }
+}
+
+private struct AnyJSONValue: Encodable {
+    let value: Any
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch value {
+        case let v as String: try container.encode(v)
+        case let v as Int: try container.encode(v)
+        case let v as Double: try container.encode(v)
+        case let v as Bool: try container.encode(v)
+        case let v as [Any]:
+            try container.encode(v.map { AnyJSONValue(value: $0) })
+        case let v as [String: Any]:
+            try container.encode(v.mapValues { AnyJSONValue(value: $0) })
+        case is NSNull:
+            try container.encodeNil()
+        default:
+            throw EncodingError.invalidValue(
+                value,
+                EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "Unsupported JSON value")
+            )
+        }
+    }
 }
