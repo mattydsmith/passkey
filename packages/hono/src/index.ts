@@ -41,7 +41,7 @@ function errorResponse(c: any, err: unknown) {
     return c.json(err.toJSON(), status);
   }
   console.error("Unexpected auth error:", err);
-  return c.json({ error: "rate_limited", message: "Internal error" }, 500);
+  return c.json({ error: "internal_error", message: "Internal error" }, 500);
 }
 
 function setSessionCookie(c: any, token: string, lifetimeSeconds: number, cookieName: string) {

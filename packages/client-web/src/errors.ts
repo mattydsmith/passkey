@@ -8,6 +8,7 @@ export type AuthClientErrorCode =
   | "rate_limited"
   | "csrf_required"
   | "invalid_request"
+  | "internal_error"
   | "network"
   | "passkey_cancelled"
   | "passkey_failed"

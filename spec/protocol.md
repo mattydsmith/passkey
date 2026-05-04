@@ -142,3 +142,4 @@ Errors: `unknown_credential` (404) if the passkey doesn't belong to the caller.
 | `csrf_required` | 403 | CSRF token missing or invalid (cookie mode) |
 | `rate_limited` | 429 | Reserved (not enforced by SDK in v1) |
 | `invalid_request` | 400 | Request body failed validation |
+| `internal_error` | 500 | Unexpected server error |
