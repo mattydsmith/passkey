@@ -8,3 +8,11 @@ coverage/
 *.tsbuildinfo
 test-results/
 playwright-report/
+
+# Swift / Xcode
+clients/**/.build/
+clients/**/.swiftpm/
+clients/**/DerivedData/
+clients/**/*.xcodeproj/xcuserdata/
+clients/**/*.xcworkspace/xcuserdata/
+clients/**/Package.resolved
