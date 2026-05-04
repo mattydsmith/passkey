@@ -56,4 +56,33 @@ describe("E2E: email-OTP flow against the Hono app", () => {
     const meBody = await me.json();
     expect(meBody.user.id).toBe(user.id);
   });
+
+  it("__test/last-otp returns the most recent OTP when NODE_ENV=test", async () => {
+    const original = process.env.NODE_ENV;
+    process.env.NODE_ENV = "test";
+    try {
+      await app.request("/auth/email/start", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "peek@example.com" }),
+      });
+      const res = await app.request("/__test/last-otp?email=peek@example.com");
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.code).toMatch(/^\d{6}$/);
+    } finally {
+      process.env.NODE_ENV = original;
+    }
+  });
+
+  it("__test/last-otp is 404 when NODE_ENV is not test", async () => {
+    const original = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    try {
+      const res = await app.request("/__test/last-otp?email=x@y.z");
+      expect(res.status).toBe(404);
+    } finally {
+      process.env.NODE_ENV = original;
+    }
+  });
 });

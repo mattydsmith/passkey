@@ -18,6 +18,8 @@ db.exec(`
   );
 `);
 
+const lastOtps = new Map<string, string>();
+
 const auth = createAuth(
   {
     rpId: "localhost",
@@ -27,6 +29,7 @@ const auth = createAuth(
       sendOtp: async ({ to, code }) => {
         // Dev: log OTPs to the console. In production, swap for Resend/SES/etc.
         console.log(`\n  📧 OTP for ${to}: ${code}\n`);
+        lastOtps.set(to, code);
       },
     },
     users: {
@@ -53,6 +56,19 @@ app.get("/", (c) =>
 );
 
 mountAuthRoutes(app, auth);
+
+// Test-only endpoint to retrieve the most recent OTP for an email.
+// Guarded at request time by NODE_ENV — never serves outside test mode.
+app.get("/__test/last-otp", (c) => {
+  if (process.env.NODE_ENV !== "test") {
+    return c.json({ error: "not_found" }, 404);
+  }
+  const email = c.req.query("email");
+  if (!email) return c.json({ error: "missing_email" }, 400);
+  const code = lastOtps.get(email);
+  if (!code) return c.json({ error: "no_otp_for_email" }, 404);
+  return c.json({ code });
+});
 
 app.get("/.well-known/apple-app-site-association", (c) =>
   c.json(auth.appleAppSiteAssociation({ appIds: [] }))
