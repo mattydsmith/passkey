@@ -14,6 +14,13 @@ import {
   markOtpConsumed,
   deleteExpiredOtps,
 } from "../src/storage/otps.js";
+import {
+  insertPasskey,
+  getPasskeyByCredentialId,
+  listPasskeysByUser,
+  updatePasskeySignCount,
+  deletePasskey,
+} from "../src/storage/passkeys.js";
 import { createHarness, type Harness } from "./setup.js";
 
 describe("storage/sessions", () => {
@@ -156,5 +163,75 @@ describe("storage/otps", () => {
     expect(deleteExpiredOtps(h.db, 1000)).toBe(1);
     expect(getOtpById(h.db, "otp_4")).toBeUndefined();
     expect(getOtpById(h.db, "otp_5")).toBeDefined();
+  });
+});
+
+describe("storage/passkeys", () => {
+  let h: Harness;
+  beforeEach(() => { h = createHarness(); });
+
+  const credId = (n: number) => new Uint8Array(16).fill(n);
+  const pubKey = (n: number) => new Uint8Array(64).fill(n);
+
+  it("inserts and reads back a passkey", () => {
+    insertPasskey(h.db, {
+      credentialId: credId(1),
+      userId: "u_1",
+      publicKey: pubKey(1),
+      signCount: 0,
+      transports: ["internal", "hybrid"],
+      aaguid: new Uint8Array(16).fill(7),
+      deviceName: "iPhone 15",
+      createdAt: 100,
+      lastUsedAt: null,
+    });
+    const row = getPasskeyByCredentialId(h.db, credId(1));
+    expect(row).toBeDefined();
+    expect(row!.userId).toBe("u_1");
+    expect(row!.transports).toEqual(["internal", "hybrid"]);
+    expect(row!.deviceName).toBe("iPhone 15");
+    expect(row!.signCount).toBe(0);
+  });
+
+  it("listPasskeysByUser returns the user's passkeys", () => {
+    insertPasskey(h.db, {
+      credentialId: credId(2), userId: "u_a", publicKey: pubKey(2),
+      signCount: 0, transports: null, aaguid: null,
+      deviceName: null, createdAt: 100, lastUsedAt: null,
+    });
+    insertPasskey(h.db, {
+      credentialId: credId(3), userId: "u_a", publicKey: pubKey(3),
+      signCount: 0, transports: null, aaguid: null,
+      deviceName: null, createdAt: 200, lastUsedAt: null,
+    });
+    insertPasskey(h.db, {
+      credentialId: credId(4), userId: "u_b", publicKey: pubKey(4),
+      signCount: 0, transports: null, aaguid: null,
+      deviceName: null, createdAt: 300, lastUsedAt: null,
+    });
+    expect(listPasskeysByUser(h.db, "u_a")).toHaveLength(2);
+    expect(listPasskeysByUser(h.db, "u_b")).toHaveLength(1);
+  });
+
+  it("updatePasskeySignCount also bumps lastUsedAt", () => {
+    insertPasskey(h.db, {
+      credentialId: credId(5), userId: "u_1", publicKey: pubKey(5),
+      signCount: 0, transports: null, aaguid: null,
+      deviceName: null, createdAt: 100, lastUsedAt: null,
+    });
+    updatePasskeySignCount(h.db, credId(5), 7, 500);
+    const after = getPasskeyByCredentialId(h.db, credId(5))!;
+    expect(after.signCount).toBe(7);
+    expect(after.lastUsedAt).toBe(500);
+  });
+
+  it("deletePasskey removes the row", () => {
+    insertPasskey(h.db, {
+      credentialId: credId(6), userId: "u_1", publicKey: pubKey(6),
+      signCount: 0, transports: null, aaguid: null,
+      deviceName: null, createdAt: 100, lastUsedAt: null,
+    });
+    deletePasskey(h.db, credId(6));
+    expect(getPasskeyByCredentialId(h.db, credId(6))).toBeUndefined();
   });
 });
