@@ -94,9 +94,13 @@ struct Transport: Sendable {
     }
 
     private func composeURL(path: String) -> URL {
-        let trimmed = path.hasPrefix("/") ? String(path.dropFirst()) : path
-        // baseURL might or might not have a trailing slash; appendingPathComponent handles that.
-        return baseURL.appendingPathComponent(trimmed)
+        // Compose by string concatenation so that callers can pass already
+        // percent-encoded segments (e.g. /passkeys/<encoded-id>) without the
+        // URL machinery double-encoding the % characters.
+        let base = baseURL.absoluteString
+        let baseTrimmed = base.hasSuffix("/") ? String(base.dropLast()) : base
+        let pathPrefixed = path.hasPrefix("/") ? path : "/" + path
+        return URL(string: baseTrimmed + pathPrefixed) ?? baseURL
     }
 }
 

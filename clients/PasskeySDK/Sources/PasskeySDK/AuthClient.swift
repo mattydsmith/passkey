@@ -106,6 +106,25 @@ public struct AuthClient: Sendable {
         try storage.save(wire.sessionToken)
         return SignInWithPasskeyResult(user: wire.user)
     }
+
+    // MARK: - Management
+
+    public func listSessions() async throws -> ListSessionsResult {
+        try await transport.request(path: "/sessions", method: .get, body: nil)
+    }
+
+    public func listPasskeys() async throws -> ListPasskeysResult {
+        try await transport.request(path: "/passkeys", method: .get, body: nil)
+    }
+
+    public func deletePasskey(id: String) async throws {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(.init(charactersIn: "/+="))) ?? id
+        let _: EmptyResponse = try await transport.request(
+            path: "/passkeys/\(encoded)",
+            method: .delete,
+            body: nil
+        )
+    }
 }
 
 /// Wire-only response shape for endpoints that issue a session token. The
