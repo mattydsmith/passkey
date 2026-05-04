@@ -12,3 +12,5 @@ export {
   beginPasskeySignIn,
   finishPasskeySignIn,
 } from "./flows/passkey-signin.js";
+export { appleAppSiteAssociation } from "./aasa.js";
+export { cleanup } from "./cleanup.js";
