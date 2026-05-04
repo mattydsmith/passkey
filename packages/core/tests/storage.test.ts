@@ -7,6 +7,13 @@ import {
   listSessionsByUser,
   deleteExpiredSessions,
 } from "../src/storage/sessions.js";
+import {
+  insertOtp,
+  getOtpById,
+  incrementOtpAttempts,
+  markOtpConsumed,
+  deleteExpiredOtps,
+} from "../src/storage/otps.js";
 import { createHarness, type Harness } from "./setup.js";
 
 describe("storage/sessions", () => {
@@ -92,5 +99,62 @@ describe("storage/sessions", () => {
     expect(removed).toBe(1);
     expect(getSessionByTokenHash(h.db, tokenHash(7))).toBeUndefined();
     expect(getSessionByTokenHash(h.db, tokenHash(8))).toBeDefined();
+  });
+});
+
+describe("storage/otps", () => {
+  let h: Harness;
+  beforeEach(() => { h = createHarness(); });
+
+  const codeHash = (n: number) => new Uint8Array(32).fill(n);
+
+  it("inserts and reads an OTP", () => {
+    insertOtp(h.db, {
+      id: "otp_1",
+      email: "matt@example.com",
+      codeHash: codeHash(1),
+      attempts: 0,
+      createdAt: 100,
+      expiresAt: 700,
+      consumedAt: null,
+    });
+    const row = getOtpById(h.db, "otp_1");
+    expect(row).toBeDefined();
+    expect(row!.email).toBe("matt@example.com");
+    expect(row!.attempts).toBe(0);
+    expect(row!.consumedAt).toBeNull();
+  });
+
+  it("increments attempts", () => {
+    insertOtp(h.db, {
+      id: "otp_2", email: "x@y", codeHash: codeHash(2),
+      attempts: 0, createdAt: 100, expiresAt: 700, consumedAt: null,
+    });
+    incrementOtpAttempts(h.db, "otp_2");
+    incrementOtpAttempts(h.db, "otp_2");
+    expect(getOtpById(h.db, "otp_2")!.attempts).toBe(2);
+  });
+
+  it("markOtpConsumed sets consumed_at", () => {
+    insertOtp(h.db, {
+      id: "otp_3", email: "x@y", codeHash: codeHash(3),
+      attempts: 0, createdAt: 100, expiresAt: 700, consumedAt: null,
+    });
+    markOtpConsumed(h.db, "otp_3", 500);
+    expect(getOtpById(h.db, "otp_3")!.consumedAt).toBe(500);
+  });
+
+  it("deleteExpiredOtps removes by cutoff", () => {
+    insertOtp(h.db, {
+      id: "otp_4", email: "x@y", codeHash: codeHash(4),
+      attempts: 0, createdAt: 100, expiresAt: 200, consumedAt: null,
+    });
+    insertOtp(h.db, {
+      id: "otp_5", email: "x@y", codeHash: codeHash(5),
+      attempts: 0, createdAt: 100, expiresAt: 5000, consumedAt: null,
+    });
+    expect(deleteExpiredOtps(h.db, 1000)).toBe(1);
+    expect(getOtpById(h.db, "otp_4")).toBeUndefined();
+    expect(getOtpById(h.db, "otp_5")).toBeDefined();
   });
 });
