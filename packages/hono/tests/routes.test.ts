@@ -200,3 +200,138 @@ describe("mountAuthRoutes — passkey routes (shape only)", () => {
     expect(body.signInId).toMatch(/^auth_/);
   });
 });
+
+describe("mountAuthRoutes — CSRF", () => {
+  async function signIn(app: ReturnType<typeof buildApp>["app"], sentOtps: { to: string; code: string }[]) {
+    const start = await app.request("/auth/email/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "matt@example.com" }),
+    });
+    const { otpId } = await start.json();
+    const verify = await app.request("/auth/email/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ otpId, code: sentOtps[0]!.code }),
+    });
+    const setCookie = verify.headers.get("set-cookie") ?? "";
+    return { setCookie, body: await verify.json() };
+  }
+
+  function parseCookies(setCookie: string): Record<string, string> {
+    // set-cookie may contain multiple cookies separated by ", " (Hono joins them)
+    const out: Record<string, string> = {};
+    const cookies = setCookie.split(/,(?=\s*\w+=)/);
+    for (const c of cookies) {
+      const first = c.split(";")[0]!.trim();
+      const [k, v] = first.split("=", 2);
+      if (k && v !== undefined) out[k] = decodeURIComponent(v);
+    }
+    return out;
+  }
+
+  it("verify sets both session and csrf cookies", async () => {
+    const { app, sentOtps } = buildApp();
+    const { setCookie } = await signIn(app, sentOtps);
+    const cookies = parseCookies(setCookie);
+    expect(cookies.session).toBeDefined();
+    expect(cookies.csrf).toBeDefined();
+    expect(cookies.csrf!.length).toBeGreaterThan(20);
+  });
+
+  it("authenticated POST in cookie mode requires X-CSRF-Token", async () => {
+    const { app, sentOtps } = buildApp();
+    const { setCookie } = await signIn(app, sentOtps);
+    const cookies = parseCookies(setCookie);
+    const cookieHeader = `session=${cookies.session}; csrf=${cookies.csrf}`;
+    // No X-CSRF-Token header → 403
+    const res = await app.request("/auth/sign-out", {
+      method: "POST",
+      headers: { Cookie: cookieHeader },
+    });
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("csrf_required");
+  });
+
+  it("authenticated POST in cookie mode with matching X-CSRF-Token succeeds", async () => {
+    const { app, sentOtps } = buildApp();
+    const { setCookie } = await signIn(app, sentOtps);
+    const cookies = parseCookies(setCookie);
+    const cookieHeader = `session=${cookies.session}; csrf=${cookies.csrf}`;
+    const res = await app.request("/auth/sign-out", {
+      method: "POST",
+      headers: { Cookie: cookieHeader, "X-CSRF-Token": cookies.csrf! },
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("bearer-mode POST does not require X-CSRF-Token", async () => {
+    const { app, sentOtps } = buildApp();
+    const { body } = await signIn(app, sentOtps);
+    const res = await app.request("/auth/sign-out", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${body.sessionToken}` },
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("sign-out clears both session and csrf cookies", async () => {
+    const { app, sentOtps } = buildApp();
+    const { setCookie } = await signIn(app, sentOtps);
+    const cookies = parseCookies(setCookie);
+    const cookieHeader = `session=${cookies.session}; csrf=${cookies.csrf}`;
+    const out = await app.request("/auth/sign-out", {
+      method: "POST",
+      headers: { Cookie: cookieHeader, "X-CSRF-Token": cookies.csrf! },
+    });
+    const cleared = out.headers.get("set-cookie") ?? "";
+    expect(cleared).toMatch(/session=;\s*Path=\/;\s*Max-Age=0/);
+    expect(cleared).toMatch(/csrf=;\s*Path=\/;\s*Max-Age=0/);
+  });
+
+  it("opt-out via { csrf: false } skips CSRF enforcement", async () => {
+    const db = new Database(":memory:");
+    runMigrations(db);
+    const sentOtps: { to: string; code: string }[] = [];
+    const users = new Map<string, string>();
+    const auth = createAuth(
+      {
+        rpId: "example.com",
+        origins: ["https://app.example.com"],
+        session: { lifetimeSeconds: 60 * 60 * 24 * 30, cookieName: "session" },
+        email: { sendOtp: async (a) => { sentOtps.push(a); } },
+        users: {
+          findOrCreateByEmail: async (e) => {
+            const v = users.get(e); if (v) return v;
+            const id = `u_${users.size + 1}`; users.set(e, id); return id;
+          },
+        },
+      },
+      { db, deps: defaultDeps }
+    );
+    const app = new Hono();
+    mountAuthRoutes(app, auth, { csrf: false });
+    const start = await app.request("/auth/email/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "matt@example.com" }),
+    });
+    const { otpId } = await start.json();
+    const verify = await app.request("/auth/email/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ otpId, code: sentOtps[0]!.code }),
+    });
+    const setCookie = verify.headers.get("set-cookie") ?? "";
+    // Sanity: csrf cookie not issued when opted out
+    expect(setCookie).not.toMatch(/csrf=/);
+    // Sign-out works with no X-CSRF-Token
+    const session = setCookie.match(/session=([^;]+)/)![1]!;
+    const out = await app.request("/auth/sign-out", {
+      method: "POST",
+      headers: { Cookie: `session=${session}` },
+    });
+    expect(out.status).toBe(200);
+  });
+});

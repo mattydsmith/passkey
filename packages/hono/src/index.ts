@@ -1,6 +1,8 @@
+import { randomBytes } from "node:crypto";
 import type { Hono } from "hono";
 import { z } from "zod";
 import { AuthError, type Auth } from "@mattsmith/passkey-sdk-core";
+import { csrfMiddleware } from "./csrf.js";
 
 const startEmailSchema = z.object({ email: z.string().email() });
 const verifyEmailSchema = z.object({
@@ -19,6 +21,8 @@ const finishSignInSchema = z.object({
 
 export interface MountOptions {
   prefix?: string;
+  csrf?: boolean;            // default: true when cookieName is configured
+  csrfCookieName?: string;   // default: "csrf"
 }
 
 function errorResponse(c: any, err: unknown) {
@@ -55,6 +59,27 @@ export function mountAuthRoutes(app: Hono, auth: Auth, opts: MountOptions = {}) 
   const prefix = opts.prefix ?? "/auth";
   const sessionLifetime = auth.config.session.lifetimeSeconds;
   const cookieName = auth.config.session.cookieName ?? "session";
+  const csrfCookieName = opts.csrfCookieName ?? "csrf";
+  const csrfEnabled = (opts.csrf ?? true) && Boolean(auth.config.session.cookieName);
+
+  if (csrfEnabled) {
+    app.use(`${prefix}/*`, csrfMiddleware({
+      sessionCookieName: cookieName,
+      csrfCookieName,
+    }));
+  }
+
+  function setCsrfCookie(c: any) {
+    const token = randomBytes(32).toString("base64url");
+    const parts = [
+      `${csrfCookieName}=${token}`,
+      `Path=/`,
+      `Max-Age=${sessionLifetime}`,
+      `SameSite=Lax`,
+    ];
+    c.header("set-cookie", parts.join("; "), { append: true });
+    return token;
+  }
 
   app.post(`${prefix}/email/start`, async (c) => {
     try {
@@ -76,6 +101,7 @@ export function mountAuthRoutes(app: Hono, auth: Auth, opts: MountOptions = {}) 
         ...(ip !== undefined ? { ip } : {}),
       });
       setSessionCookie(c, result.sessionToken, sessionLifetime, cookieName);
+      if (csrfEnabled) setCsrfCookie(c);
       return c.json(result);
     } catch (e) { return errorResponse(c, e); }
   });
@@ -120,6 +146,7 @@ export function mountAuthRoutes(app: Hono, auth: Auth, opts: MountOptions = {}) 
         ...(siIp !== undefined ? { ip: siIp } : {}),
       });
       setSessionCookie(c, result.sessionToken, sessionLifetime, cookieName);
+      if (csrfEnabled) setCsrfCookie(c);
       return c.json(result);
     } catch (e) { return errorResponse(c, e); }
   });
@@ -148,6 +175,9 @@ export function mountAuthRoutes(app: Hono, auth: Auth, opts: MountOptions = {}) 
       }
       if (token) auth.signOut({ sessionToken: token });
       c.header("set-cookie", `${cookieName}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`);
+      if (csrfEnabled) {
+        c.header("set-cookie", `${csrfCookieName}=; Path=/; Max-Age=0; SameSite=Lax`, { append: true });
+      }
       return c.json({ ok: true });
     } catch (e) { return errorResponse(c, e); }
   });
