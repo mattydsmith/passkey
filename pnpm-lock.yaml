@@ -43,6 +43,37 @@ importers:
         specifier: ^1.6.0
         version: 1.6.1(@types/node@20.19.39)
 
+  packages/hono:
+    dependencies:
+      '@mattsmith/passkey-sdk-core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.0
+        version: 7.6.13
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.39
+      better-sqlite3:
+        specifier: ^11.0.0
+        version: 11.10.0
+      hono:
+        specifier: ^4.5.0
+        version: 4.12.16
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(postcss@8.5.13)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@20.19.39)
+
 packages:
 
   '@esbuild/aix-ppc64@0.21.5':
@@ -709,6 +740,10 @@ packages:
 
   github-from-package@0.0.0:
     resolution: {integrity: sha512-SyHy3T1v2NUXn29OsWdxmK6RwHD+vkj3v8en8AOBZ1wBQ/hCAQ5bAQTD02kW4W9tUp/3Qh6J8r9EvntiyCmOOw==}
+
+  hono@4.12.16:
+    resolution: {integrity: sha512-jN0ZewiNAWSe5khM3EyCmBb250+b40wWbwNILNfEvq84VREWwOIkuUsFONk/3i3nqkz7Oe1PcpM2mwQEK2L9Kg==}
+    engines: {node: '>=16.9.0'}
 
   human-signals@5.0.0:
     resolution: {integrity: sha512-AXcZb6vzzrFAUE61HnN4mpLqd/cSIwNQjtNWR0euPm6y0iqx3G4gOXaIDdtdDwZmhwe82LA6+zinmW4UBWVePQ==}
@@ -1699,6 +1734,8 @@ snapshots:
   get-stream@8.0.1: {}
 
   github-from-package@0.0.0: {}
+
+  hono@4.12.16: {}
 
   human-signals@5.0.0: {}
 
