@@ -67,6 +67,10 @@ app.get("/api/me", async (c) => {
   }
 });
 
-const port = Number(process.env.PORT ?? 3000);
-serve({ fetch: app.fetch, port });
-console.log(`Listening on http://localhost:${port}`);
+export { app, auth, db };
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const port = Number(process.env.PORT ?? 3000);
+  serve({ fetch: app.fetch, port });
+  console.log(`Listening on http://localhost:${port}`);
+}
