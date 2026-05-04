@@ -12,6 +12,29 @@ Authenticated requests carry the session token either as:
 
 The client picks one mode at construction time.
 
+## CSRF (cookie mode only)
+
+When the client uses the cookie session mode, the server enforces a
+double-submit cookie pattern on all non-GET requests under the auth
+prefix. On every session-issuing response (`/auth/email/verify`,
+`/auth/passkey/sign-in/finish`), the server sets a `csrf` cookie
+alongside `session`. The cookie is **not** `HttpOnly` — the client
+reads it and echoes the value as `X-CSRF-Token` on subsequent
+non-GET requests. The server returns `csrf_required` (403) on any
+non-GET request that has a session cookie but a missing or
+mismatching X-CSRF-Token header.
+
+Bearer-mode clients (no session cookie, `Authorization: Bearer …`)
+do not need to send X-CSRF-Token; the middleware skips the check
+when no session cookie is present. Pre-session traffic
+(`/auth/email/start`, `/auth/email/verify`,
+`/auth/passkey/sign-in/start`, `/auth/passkey/sign-in/finish`) is
+also exempt for the same reason.
+
+The `csrf` cookie is cleared by `/auth/sign-out` alongside `session`.
+The cookie name and the enforcement default are configurable on the
+server adapter.
+
 ## Endpoints
 
 ### POST /auth/email/start
@@ -114,4 +137,6 @@ Errors: `unknown_credential` (404) if the passkey doesn't belong to the caller.
 | `invalid_credential` | 401 | Passkey signature didn't verify |
 | `unknown_credential` | 404 | Credential ID not found / not yours |
 | `unauthenticated` | 401 | No session, or session expired |
+| `csrf_required` | 403 | CSRF token missing or invalid (cookie mode) |
 | `rate_limited` | 429 | Reserved (not enforced by SDK in v1) |
+| `invalid_request` | 400 | Request body failed validation |
