@@ -1,8 +1,9 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { Db } from "../db.js";
 import type { Deps } from "../deps.js";
-import type { SendOtp, OtpStartResult } from "../types.js";
-import { insertOtp } from "../storage/otps.js";
+import type { SendOtp, OtpStartResult, FindOrCreateByEmail, User } from "../types.js";
+import { insertOtp, getOtpById, incrementOtpAttempts, markOtpConsumed } from "../storage/otps.js";
+import { AuthError } from "../errors.js";
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -48,4 +49,42 @@ export async function startEmailOtp(args: {
 
   await sendOtp({ to: normalized, code });
   return { otpId: id, expiresInSeconds: expirySeconds };
+}
+
+export async function verifyEmailOtp(args: {
+  db: Db;
+  deps: Deps;
+  findOrCreateByEmail: FindOrCreateByEmail;
+  otpId: string;
+  code: string;
+  maxAttempts: number;
+}): Promise<User> {
+  const { db, deps, findOrCreateByEmail, otpId, code, maxAttempts } = args;
+  const row = getOtpById(db, otpId);
+  if (!row) {
+    throw new AuthError("invalid_otp", "OTP not found");
+  }
+  if (row.consumedAt !== null) {
+    throw new AuthError("invalid_otp", "OTP already consumed");
+  }
+  if (row.attempts >= maxAttempts) {
+    throw new AuthError("otp_attempts_exceeded", "Too many attempts");
+  }
+  if (row.expiresAt <= deps.now()) {
+    throw new AuthError("otp_expired", "OTP has expired");
+  }
+
+  const provided = hashCode(code);
+  const matches =
+    provided.length === row.codeHash.length &&
+    timingSafeEqual(provided, row.codeHash);
+
+  if (!matches) {
+    incrementOtpAttempts(db, otpId);
+    throw new AuthError("invalid_otp", "Code does not match");
+  }
+
+  markOtpConsumed(db, otpId, deps.now());
+  const userId = await findOrCreateByEmail(row.email);
+  return { id: userId, email: row.email };
 }

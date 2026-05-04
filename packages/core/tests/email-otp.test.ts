@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { startEmailOtp } from "../src/flows/email-otp.js";
+import { startEmailOtp, verifyEmailOtp } from "../src/flows/email-otp.js";
+import { AuthError } from "../src/errors.js";
 import { createHarness, type Harness } from "./setup.js";
 
 describe("startEmailOtp", () => {
@@ -41,5 +42,99 @@ describe("startEmailOtp", () => {
       .get(otpId) as { code_hash: Uint8Array };
     expect(Buffer.from(row.code_hash).toString("utf8")).not.toBe(code);
     expect(row.code_hash.length).toBe(32); // SHA-256
+  });
+});
+
+describe("verifyEmailOtp", () => {
+  let h: Harness;
+  beforeEach(() => { h = createHarness(); });
+
+  async function startAndGet(email = "matt@example.com") {
+    const { otpId } = await startEmailOtp({
+      db: h.db, deps: h.deps, sendOtp: h.sendOtp,
+      email, expirySeconds: 600,
+    });
+    const code = h.sentOtps.at(-1)!.code;
+    return { otpId, code };
+  }
+
+  it("returns userId on success and creates the user via hook", async () => {
+    const { otpId, code } = await startAndGet();
+    const result = await verifyEmailOtp({
+      db: h.db, deps: h.deps,
+      findOrCreateByEmail: h.findOrCreateByEmail,
+      otpId, code,
+      maxAttempts: 5,
+    });
+    expect(result.id).toBe("u_1");
+    expect(result.email).toBe("matt@example.com");
+    expect(h.users.get("matt@example.com")).toBe("u_1");
+  });
+
+  it("marks the OTP consumed after success", async () => {
+    const { otpId, code } = await startAndGet();
+    await verifyEmailOtp({
+      db: h.db, deps: h.deps,
+      findOrCreateByEmail: h.findOrCreateByEmail,
+      otpId, code, maxAttempts: 5,
+    });
+    const row = h.db
+      .prepare("SELECT consumed_at FROM auth_email_otps WHERE id = ?")
+      .get(otpId) as { consumed_at: number | null };
+    expect(row.consumed_at).not.toBeNull();
+  });
+
+  it("rejects an already-consumed OTP", async () => {
+    const { otpId, code } = await startAndGet();
+    await verifyEmailOtp({
+      db: h.db, deps: h.deps, findOrCreateByEmail: h.findOrCreateByEmail,
+      otpId, code, maxAttempts: 5,
+    });
+    await expect(
+      verifyEmailOtp({
+        db: h.db, deps: h.deps, findOrCreateByEmail: h.findOrCreateByEmail,
+        otpId, code, maxAttempts: 5,
+      })
+    ).rejects.toThrow(/invalid_otp|consumed/i);
+  });
+
+  it("rejects unknown otpId as invalid_otp", async () => {
+    await expect(
+      verifyEmailOtp({
+        db: h.db, deps: h.deps, findOrCreateByEmail: h.findOrCreateByEmail,
+        otpId: "otp_does_not_exist", code: "123456", maxAttempts: 5,
+      })
+    ).rejects.toMatchObject({ code: "invalid_otp" });
+  });
+
+  it("counts wrong attempts and rejects after maxAttempts", async () => {
+    const { otpId } = await startAndGet();
+    for (let i = 0; i < 5; i++) {
+      await expect(
+        verifyEmailOtp({
+          db: h.db, deps: h.deps, findOrCreateByEmail: h.findOrCreateByEmail,
+          otpId, code: "000000", maxAttempts: 5,
+        })
+      ).rejects.toMatchObject({ code: "invalid_otp" });
+    }
+    // 6th attempt: even with the right code, it's now exceeded.
+    const realCode = h.sentOtps[0]!.code;
+    await expect(
+      verifyEmailOtp({
+        db: h.db, deps: h.deps, findOrCreateByEmail: h.findOrCreateByEmail,
+        otpId, code: realCode, maxAttempts: 5,
+      })
+    ).rejects.toMatchObject({ code: "otp_attempts_exceeded" });
+  });
+
+  it("rejects expired OTPs as otp_expired", async () => {
+    const { otpId, code } = await startAndGet();
+    h.clock.now += 10_000; // way past 600s expiry
+    await expect(
+      verifyEmailOtp({
+        db: h.db, deps: h.deps, findOrCreateByEmail: h.findOrCreateByEmail,
+        otpId, code, maxAttempts: 5,
+      })
+    ).rejects.toMatchObject({ code: "otp_expired" });
   });
 });
