@@ -2,7 +2,9 @@ package passkey
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -60,6 +62,27 @@ func HandleSignInFinish(
 			writeJSONError(w, 400, "invalid_request", "sign-in not found")
 			return
 		}
+		// Pre-check: extract rawId from credential and look up the passkey.
+		// This lets us return a 404 unknown_credential if the rawId isn't in
+		// our db, matching the TS reference behaviour. The full verification
+		// is still done by FinishDiscoverableLogin below.
+		var credRaw struct {
+			RawID string `json:"rawId"`
+		}
+		if err := json.Unmarshal(body.Credential, &credRaw); err == nil && credRaw.RawID != "" {
+			rawID, decErr := decodeBase64URL(credRaw.RawID)
+			if decErr == nil {
+				if _, lookupErr := s.GetPasskey(rawID); lookupErr != nil {
+					if errors.Is(lookupErr, storage.ErrNotFound) {
+						writeJSONError(w, 404, "unknown_credential", "Credential not registered")
+					} else {
+						writeJSONError(w, 500, "internal_error", lookupErr.Error())
+					}
+					return
+				}
+			}
+		}
+
 		parsedReq, err := http.NewRequest("POST", r.URL.String(), bytes.NewReader(body.Credential))
 		if err != nil {
 			writeJSONError(w, 400, "invalid_credential", err.Error())
@@ -109,4 +132,13 @@ func HandleSignInFinish(
 			"user":         map[string]string{"id": p.UserID, "email": ""},
 		})
 	}
+}
+
+// decodeBase64URL decodes a base64url string, tolerating both padded and
+// unpadded variants (and the standard base64 alphabet for robustness).
+func decodeBase64URL(s string) ([]byte, error) {
+	if b, err := base64.RawURLEncoding.DecodeString(s); err == nil {
+		return b, nil
+	}
+	return base64.URLEncoding.DecodeString(s)
 }

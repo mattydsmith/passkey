@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 
 	"github.com/mattydsmith/passkey/servers/go/auth"
@@ -26,7 +27,12 @@ func HandleRegisterStart(s storage.Storage, wa *webauthn.WebAuthn, pending *Pend
 			writeJSONError(w, 500, "internal_error", "Failed to load user")
 			return
 		}
-		creation, sessionData, err := wa.BeginRegistration(u)
+		creation, sessionData, err := wa.BeginRegistration(u,
+			webauthn.WithAuthenticatorSelection(protocol.AuthenticatorSelection{
+				ResidentKey:      protocol.ResidentKeyRequirementPreferred,
+				UserVerification: protocol.VerificationPreferred,
+			}),
+		)
 		if err != nil {
 			writeJSONError(w, 500, "internal_error", err.Error())
 			return
