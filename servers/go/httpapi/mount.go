@@ -39,6 +39,12 @@ func Mount(r chi.Router, cfg Config) error {
 	}
 
 	r.Route("/auth", func(r chi.Router) {
+		// Cookie-mode CSRF protection. Skipped for bearer-only flows by the
+		// middleware itself when no session cookie is present.
+		if cfg.SessionCookieName != "" {
+			r.Use(auth.CSRFMiddleware(cfg.SessionCookieName, cfg.CSRFCookieName))
+		}
+
 		r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 			writeJSON(w, 200, map[string]bool{"ok": true})
 		})
@@ -141,6 +147,10 @@ func handleEmailVerify(cfg Config) http.HandlerFunc {
 		}
 		if cfg.SessionCookieName != "" {
 			setSessionCookie(w, r, cfg.SessionCookieName, token, int(cfg.SessionTTL.Seconds()))
+			csrfTok, err := auth.RandomToken(32)
+			if err == nil {
+				setCSRFCookie(w, r, cfg.CSRFCookieName, csrfTok, int(cfg.SessionTTL.Seconds()))
+			}
 		}
 		writeJSON(w, 200, resp{
 			SessionToken: token,

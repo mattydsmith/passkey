@@ -123,6 +123,12 @@ func HandleSignInFinish(
 		}
 		if sessionCookieName != "" {
 			setSessionCookie(w, r, sessionCookieName, token, int(sessionTTL.Seconds()))
+			if csrfCookieName != "" {
+				csrfTok, err := auth.RandomToken(32)
+				if err == nil {
+					setCSRFCookie(w, r, csrfCookieName, csrfTok, int(sessionTTL.Seconds()))
+				}
+			}
 		}
 		writeJSON(w, 200, map[string]any{
 			"sessionToken": token,
