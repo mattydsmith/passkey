@@ -22,4 +22,10 @@ type Config struct {
 	OTPTTL            time.Duration // defaults to 10m
 	SessionTTL        time.Duration // defaults to 30 * 24h
 	Now               func() time.Time
+
+	// GetOrCreateUserID resolves an email to a stable userID. Host apps own
+	// the user table; the SDK never persists email -> userID itself. If nil,
+	// Mount uses a no-op that returns the email itself as the userID (fine
+	// for demo/parity, NOT recommended for production).
+	GetOrCreateUserID func(email string) (string, error)
 }
