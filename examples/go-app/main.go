@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/mattydsmith/passkey/servers/go/httpapi"
+	"github.com/mattydsmith/passkey/servers/go/storage"
 )
 
 func main() {
@@ -66,5 +68,22 @@ func main() {
 }
 
 // placeholderStorage is a temporary nil-safe Storage so Mount accepts the
-// config before the sqlite impl exists. Replaced in Phase 3.
+// config before the sqlite impl is wired in main. Replaced in Phase 3b.
 type placeholderStorage struct{}
+
+func (placeholderStorage) CreateSession(storage.Session) error               { return nil }
+func (placeholderStorage) GetSession([]byte) (*storage.Session, error)       { return nil, storage.ErrNotFound }
+func (placeholderStorage) TouchSession([]byte, time.Time) error              { return nil }
+func (placeholderStorage) DeleteSession([]byte) error                        { return nil }
+func (placeholderStorage) ListSessions(string) ([]storage.Session, error)    { return nil, nil }
+func (placeholderStorage) CreateOTP(storage.EmailOTP) error                  { return nil }
+func (placeholderStorage) GetOTP(string) (*storage.EmailOTP, error)          { return nil, storage.ErrNotFound }
+func (placeholderStorage) IncrementOTPAttempts(string) (int, error)          { return 0, nil }
+func (placeholderStorage) ConsumeOTP(string, time.Time) error                { return nil }
+func (placeholderStorage) ForceExpireOTP(string) error                       { return nil }
+func (placeholderStorage) CreatePasskey(storage.Passkey) error               { return nil }
+func (placeholderStorage) GetPasskey([]byte) (*storage.Passkey, error)       { return nil, storage.ErrNotFound }
+func (placeholderStorage) ListPasskeys(string) ([]storage.Passkey, error)    { return nil, nil }
+func (placeholderStorage) UpdatePasskeySignCount([]byte, uint32, time.Time) error { return nil }
+func (placeholderStorage) DeletePasskey([]byte) error                        { return nil }
+func (placeholderStorage) Close() error                                      { return nil }
