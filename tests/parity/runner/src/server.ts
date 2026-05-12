@@ -33,6 +33,7 @@ async function bootHonoApp(): Promise<ServerHandle> {
     label: "hono-app",
     cmd: TSX_BIN,
     args: [HONO_APP_ENTRY],
+    deadlineMs: 30_000,
   });
 }
 
@@ -43,6 +44,7 @@ async function bootGoApp(): Promise<ServerHandle> {
     cmd: "go",
     args: ["run", "."],
     cwdOverride: GO_APP_DIR,
+    deadlineMs: 60_000, // generous to absorb `go run` cold-start
   });
 }
 
@@ -51,12 +53,17 @@ interface BootArgs {
   cmd: string;
   args: string[];
   cwdOverride?: string; // override the temp cwd if the binary needs to be invoked from its module dir
+  deadlineMs?: number;  // how long to wait for the subprocess to become reachable
 }
 
 async function bootSubprocess(b: BootArgs): Promise<ServerHandle> {
   const port = await getFreePort();
+  // Always created. Used as the subprocess cwd unless cwdOverride is set
+  // (Go path: subprocess runs from its module dir, but tmpCwd is still its
+  // scratch space for the sqlite db via PASSKEY_DB_DIR below).
   const tmpCwd = await mkdtemp(join(tmpdir(), `parity-${b.label}-`));
   const cwd = b.cwdOverride ?? tmpCwd;
+  const deadlineMs = b.deadlineMs ?? 60_000;
 
   const child = spawn(b.cmd, b.args, {
     cwd,
@@ -89,7 +96,7 @@ async function bootSubprocess(b: BootArgs): Promise<ServerHandle> {
   });
 
   const url = `http://localhost:${port}`;
-  const deadline = Date.now() + 60_000; // generous: go run cold-start
+  const deadline = Date.now() + deadlineMs;
   while (Date.now() < deadline) {
     if (exited) {
       await rm(tmpCwd, { recursive: true, force: true });
@@ -113,7 +120,9 @@ async function bootSubprocess(b: BootArgs): Promise<ServerHandle> {
 
   child.kill("SIGTERM");
   await rm(tmpCwd, { recursive: true, force: true });
-  throw new Error(`${b.label} did not become reachable on ${url} within 60s`);
+  throw new Error(
+    `${b.label} did not become reachable on ${url} within ${deadlineMs}ms`,
+  );
 }
 
 function makeHandle(
