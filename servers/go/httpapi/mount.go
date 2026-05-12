@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -12,6 +13,13 @@ import (
 	"github.com/mattydsmith/passkey/servers/go/auth"
 	"github.com/mattydsmith/passkey/servers/go/passkey"
 )
+
+// emailLike is a deliberately loose check matching Zod's `.email()` posture
+// (looks-like-an-address, not RFC 5322). The TS impl uses Zod here.
+var emailLike = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
+
+// sixDigits matches the OTP code shape — exactly 6 ASCII digits.
+var sixDigits = regexp.MustCompile(`^\d{6}$`)
 
 // Mount wires the SDK's auth routes onto r. The full route set is added in
 // later phases; Phase 3 wires the email/session endpoints.
@@ -93,6 +101,10 @@ func handleEmailStart(cfg Config) http.HandlerFunc {
 			return
 		}
 		email := strings.ToLower(strings.TrimSpace(body.Email))
+		if !emailLike.MatchString(email) {
+			writeJSON(w, 400, errBody{"invalid_request", "email looks malformed"})
+			return
+		}
 		id, ttl, err := auth.StartEmailOTP(cfg.Storage, cfg.EmailSender, email, cfg.OTPTTL, cfg.Now())
 		if err != nil {
 			writeError(w, err)
@@ -119,6 +131,10 @@ func handleEmailVerify(cfg Config) http.HandlerFunc {
 		var body req
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.OTPID == "" || body.Code == "" {
 			writeJSON(w, 400, errBody{"invalid_request", "otpId and code required"})
+			return
+		}
+		if !sixDigits.MatchString(body.Code) {
+			writeJSON(w, 400, errBody{"invalid_request", "code must be six digits"})
 			return
 		}
 		email, err := auth.VerifyEmailOTP(cfg.Storage, body.OTPID, body.Code, cfg.Now())
