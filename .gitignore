@@ -8,6 +8,7 @@ coverage/
 *.tsbuildinfo
 test-results/
 playwright-report/
+.claude/
 
 # Swift / Xcode
 clients/**/.build/
