@@ -59,7 +59,11 @@ func TestVerifyOTP_WrongCode_AttemptsExceeded(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	id, _, _ := StartEmailOTP(s, em, "alice@example.com", 10*time.Minute, now)
 
-	for i := 0; i < OTPMaxAttempts-1; i++ {
+	// OTPMaxAttempts wrong codes each return ErrInvalidOTP (attempts go from 0
+	// to OTPMaxAttempts). The (OTPMaxAttempts+1)th call finds attempts >=
+	// OTPMaxAttempts at the top of the function and returns ErrOTPAttemptsExceeded.
+	// This mirrors the TS verifyEmailOtp semantics.
+	for i := 0; i < OTPMaxAttempts; i++ {
 		if _, err := VerifyEmailOTP(s, id, "000000", now); err != ErrInvalidOTP {
 			t.Fatalf("attempt %d: want ErrInvalidOTP, got %v", i, err)
 		}

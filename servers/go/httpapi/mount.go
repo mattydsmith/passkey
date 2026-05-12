@@ -43,6 +43,7 @@ func Mount(r chi.Router, cfg Config) error {
 		r.Post("/email/verify", handleEmailVerify(cfg))
 		r.Get("/me", handleMe(cfg))
 		r.Post("/sign-out", handleSignOut(cfg))
+		r.Get("/sessions", handleListSessions(cfg))
 	})
 	return nil
 }
@@ -144,5 +145,43 @@ func handleSignOut(cfg Config) http.HandlerFunc {
 			clearCSRFCookie(w, cfg.CSRFCookieName)
 		}
 		writeJSON(w, 200, map[string]bool{"ok": true})
+	}
+}
+
+func handleListSessions(cfg Config) http.HandlerFunc {
+	type sessionItem struct {
+		CreatedAt  int64  `json:"createdAt"`
+		ExpiresAt  int64  `json:"expiresAt"`
+		LastSeenAt int64  `json:"lastSeenAt"`
+		UserAgent  string `json:"userAgent,omitempty"`
+		IP         string `json:"ip,omitempty"`
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, err := auth.RequireSession(cfg.Storage, r, cfg.SessionCookieName, cfg.Now())
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		sessions, err := cfg.Storage.ListSessions(userID)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		items := make([]sessionItem, 0, len(sessions))
+		for _, s := range sessions {
+			item := sessionItem{
+				CreatedAt:  s.CreatedAt.Unix(),
+				ExpiresAt:  s.ExpiresAt.Unix(),
+				LastSeenAt: s.LastSeenAt.Unix(),
+			}
+			if s.UserAgent != nil {
+				item.UserAgent = *s.UserAgent
+			}
+			if s.IP != nil {
+				item.IP = *s.IP
+			}
+			items = append(items, item)
+		}
+		writeJSON(w, 200, map[string]any{"sessions": items})
 	}
 }

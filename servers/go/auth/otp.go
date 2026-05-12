@@ -52,7 +52,8 @@ func StartEmailOTP(s storage.Storage, emailer EmailSender, email string, ttl tim
 
 // VerifyEmailOTP returns the user's email if the code matches and is unexpired.
 // Increments attempts on mismatch; returns ErrOTPAttemptsExceeded once the cap
-// is hit.
+// is hit (checked at the start of each call, matching the TS impl semantics:
+// N wrong codes → N×401, then the (N+1)th call → 429).
 func VerifyEmailOTP(s storage.Storage, otpID, code string, now time.Time) (email string, err error) {
 	o, err := s.GetOTP(otpID)
 	if err != nil {
@@ -61,14 +62,15 @@ func VerifyEmailOTP(s storage.Storage, otpID, code string, now time.Time) (email
 	if o.ConsumedAt != nil {
 		return "", ErrInvalidOTP
 	}
+	// Check the attempt count BEFORE the hash — mirrors TS verifyEmailOtp.
+	if o.Attempts >= OTPMaxAttempts {
+		return "", ErrOTPAttemptsExceeded
+	}
 	if now.After(o.ExpiresAt) {
 		return "", ErrOTPExpired
 	}
 	if string(HashToken(code)) != string(o.CodeHash) {
-		attempts, _ := s.IncrementOTPAttempts(otpID)
-		if attempts >= OTPMaxAttempts {
-			return "", ErrOTPAttemptsExceeded
-		}
+		_, _ = s.IncrementOTPAttempts(otpID)
 		return "", ErrInvalidOTP
 	}
 	if err := s.ConsumeOTP(otpID, now); err != nil {
