@@ -11,7 +11,11 @@ import {
   Transport,
   type TransportResponse,
 } from "./transport.js";
-import type { WebAuthnHarness, CeremonyKind } from "./webauthn.js";
+import type {
+  CeremonyKind,
+  CeremonyResult,
+  WebAuthnHarness,
+} from "./webauthn.js";
 
 export interface RunOptions {
   baseUrl: string;
@@ -167,7 +171,13 @@ async function processBody(
         throw new Error(`$webauthn marker requires an "options" field`);
       }
       const options = interpolate(rawOptions, ctx);
-      return await harness.ceremony(kind as CeremonyKind, options);
+      const credential = await harness.ceremony(kind as CeremonyKind, options);
+      const corrupt = obj.corrupt;
+      if (corrupt === undefined) return credential;
+      if (corrupt === "signature") return corruptSignature(credential);
+      throw new Error(
+        `unsupported corrupt mode: ${JSON.stringify(corrupt)} (expected "signature")`,
+      );
     }
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(obj)) {
@@ -208,4 +218,24 @@ function applyCaptures(
   for (const [name, path] of Object.entries(captures)) {
     ctx[name] = pickJsonPath(response, path);
   }
+}
+
+function corruptSignature(cred: CeremonyResult): CeremonyResult {
+  if (cred.response.signature === undefined) {
+    throw new Error(
+      `cannot corrupt signature: ceremony result has no signature (use $webauthn: "get")`,
+    );
+  }
+  const buf = Buffer.from(cred.response.signature, "base64url");
+  if (buf.length === 0) {
+    throw new Error("cannot corrupt signature: empty signature");
+  }
+  buf[0] = (buf[0] ?? 0) ^ 0xff;
+  return {
+    ...cred,
+    response: {
+      ...cred.response,
+      signature: buf.toString("base64url"),
+    },
+  };
 }

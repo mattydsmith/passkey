@@ -1,0 +1,63 @@
+{
+  "name": "passkey/register-happy",
+  "mode": "bearer",
+  "steps": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/start",
+        "body": { "email": "parity-register-happy@example.com" }
+      },
+      "expect": { "status": 200 },
+      "capture": { "otpId": "$.body.otpId" }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/__test/last-otp?email=parity-register-happy@example.com"
+      },
+      "expect": { "status": 200 },
+      "capture": { "code": "$.body.code" }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/verify",
+        "body": { "otpId": "{{otpId}}", "code": "{{code}}" }
+      },
+      "expect": {
+        "status": 200,
+        "body": { "sessionToken": { "type": "string", "nonEmpty": true } }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/passkey/register/start",
+        "body": {}
+      },
+      "expect": {
+        "status": 200,
+        "body": { "registrationId": { "type": "string", "nonEmpty": true } }
+      },
+      "capture": {
+        "registrationId": "$.body.registrationId",
+        "options": "$.body.options"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/passkey/register/finish",
+        "body": {
+          "registrationId": "{{registrationId}}",
+          "credential": { "$webauthn": "create", "options": "{{options}}" }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": { "passkeyId": { "type": "string", "nonEmpty": true } }
+      }
+    }
+  ]
+}

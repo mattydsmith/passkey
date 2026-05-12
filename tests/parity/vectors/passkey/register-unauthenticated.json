@@ -1,0 +1,17 @@
+{
+  "name": "passkey/register-unauthenticated",
+  "mode": "bearer",
+  "steps": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/passkey/register/start",
+        "body": {}
+      },
+      "expect": {
+        "status": 401,
+        "body": { "error": "unauthenticated" }
+      }
+    }
+  ]
+}
