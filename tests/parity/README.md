@@ -59,6 +59,20 @@ The auto-boot spawns `tsx examples/hono-app/src/index.ts` with
 in a temp dir so each run starts with a fresh SQLite DB. The subprocess
 is torn down (and the temp dir removed) on exit.
 
+## Choosing a server
+
+The runner can auto-boot either of the two server implementations. Default is
+`ts` for speed during local dev (the Go binary has a `go run` cold-start cost).
+
+```bash
+pnpm test:parity                       # --server=ts (default) — boots examples/hono-app
+pnpm test:parity --server=go           # boots examples/go-app
+pnpm test:parity --url=http://...      # external server (--server is ignored)
+```
+
+CI runs both legs in matrix (see `.github/workflows/parity.yml`), so a change
+that breaks one server's conformance fails the matching matrix leg on push.
+
 ## Filtering and external targets
 
 The CLI behind `pnpm test:parity` is `tests/parity/runner/src/index.ts`:
@@ -66,12 +80,13 @@ The CLI behind `pnpm test:parity` is `tests/parity/runner/src/index.ts`:
 ```bash
 cd tests/parity/runner
 
-pnpm test:e2e -- --only=email/verify    # run only matching vector paths
-pnpm test:e2e -- --url=http://...       # skip auto-boot; target an external server
+pnpm test:e2e -- --only=email/verify              # run only matching vector paths
+pnpm test:e2e -- --server=go --only=passkey       # combine flags
+pnpm test:e2e -- --url=http://...                 # skip auto-boot; target an external server
 ```
 
-`--url` is how a future second implementation (e.g. a Go server) is
-test-driven against the same vectors.
+`--url` is how any other spec-conformant server (a Rust port, a Python port, etc.)
+can be test-driven against the same vectors. `--server` is for the bundled implementations.
 
 For ad-hoc verification of one or two vectors against a hand-booted
 server, `scripts/verify-vector.ts` is also there:

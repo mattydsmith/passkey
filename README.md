@@ -20,6 +20,21 @@ The defining constraint is **multi-platform from day one**: a single project's b
 - **Phase 1 — TypeScript server:** shipped (`packages/core`, `packages/hono`, `packages/cli`).
 - **Phase 2 — Web client:** shipped (`packages/client-web`) plus cookie-mode prerequisites on the server (CSRF middleware, `Secure` cookies, threaded `Max-Age`).
 - **Phase 3 — Swift / iOS client:** shipped (`clients/PasskeySDK`) plus a SwiftUI demo (`clients/ios-demo`).
+- **Phase 4 — Go server:** shipped (`servers/go/`, `examples/go-app`). Peer implementation of the TS server; both pass the same `tests/parity/` HTTP conformance suite under a CI matrix (`pnpm test:parity --server={ts,go}`).
+
+## Server implementations
+
+The SDK ships two interchangeable server implementations of the same HTTP
+contract (`spec/protocol.md`). Pick the one that fits your stack — the web
+(`packages/client-web`) and Swift (`clients/PasskeySDK`) clients work against
+either unchanged.
+
+- **TypeScript:** `packages/core` + `packages/hono`. Consumed via `examples/hono-app`. Best for Node/Bun apps already using Hono.
+- **Go:** `servers/go/`. Consumed via `examples/go-app`. Best for Go apps; `httpapi.Mount(r, cfg)` mounts on any `chi` router.
+
+Both are exercised against the same `tests/parity/` HTTP conformance suite.
+Run `pnpm test:parity --server=ts` or `--server=go` to verify either against
+the vector library. CI runs both legs on every push.
 
 ## Packages
 
@@ -30,6 +45,7 @@ The defining constraint is **multi-platform from day one**: a single project's b
 | [`@mattsmith/passkey-sdk-cli`](packages/cli) | Server: `passkey-sdk migrate <db>` for running schema migrations. |
 | [`@mattsmith/passkey-sdk-client-web`](packages/client-web) | Browser client: `fetch` + `navigator.credentials` wrapper, typed errors, cookie/header session modes. |
 | [`PasskeySDK`](clients/PasskeySDK) (Swift) | Native iOS / macOS client: `URLSession` + `AuthenticationServices` + Keychain. Bearer-mode only. |
+| [`servers/go`](servers/go) | Server: Go peer implementation of the TS server. Mountable on any `chi` router; backed by `modernc.org/sqlite` (pure Go, no cgo) and `github.com/go-webauthn/webauthn`. |
 
 ## Examples
 
@@ -37,6 +53,7 @@ The defining constraint is **multi-platform from day one**: a single project's b
 |---|---|
 | [`examples/hono-app`](examples/hono-app) | Reference server using the Hono adapter. Console-logs OTPs in dev. |
 | [`examples/web-demo`](examples/web-demo) | Vite app exercising every public method of the web client. Has a Playwright e2e with a Chromium WebAuthn virtual authenticator. |
+| [`examples/go-app`](examples/go-app) | Reference Go server using `servers/go`. Auto-booted by the parity runner under `--server=go`. |
 | [`clients/ios-demo`](clients/ios-demo) | SwiftUI app exercising every public method of `PasskeySDK`. Manual run target. |
 
 ## Quick start
