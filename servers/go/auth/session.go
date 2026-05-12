@@ -46,7 +46,8 @@ func RequireSession(s storage.Storage, r *http.Request, cookieName string, now t
 	if err != nil {
 		return "", ErrUnauthenticated
 	}
-	if now.After(sess.ExpiresAt) {
+	// Treat now == ExpiresAt as expired (matches TS: `expiresAt <= now`).
+	if !now.Before(sess.ExpiresAt) {
 		return "", ErrUnauthenticated
 	}
 	_ = s.TouchSession(sess.TokenHash, now)

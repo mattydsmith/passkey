@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -60,7 +61,8 @@ func handleEmailStart(cfg Config) http.HandlerFunc {
 			writeJSON(w, 400, errBody{"invalid_request", "email required"})
 			return
 		}
-		id, ttl, err := auth.StartEmailOTP(cfg.Storage, cfg.EmailSender, body.Email, cfg.OTPTTL, cfg.Now())
+		email := strings.ToLower(strings.TrimSpace(body.Email))
+		id, ttl, err := auth.StartEmailOTP(cfg.Storage, cfg.EmailSender, email, cfg.OTPTTL, cfg.Now())
 		if err != nil {
 			writeError(w, err)
 			return

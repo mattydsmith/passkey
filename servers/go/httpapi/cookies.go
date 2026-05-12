@@ -30,7 +30,7 @@ func clearSessionCookie(w http.ResponseWriter, name string) {
 		Name:     name,
 		Value:    "",
 		Path:     "/",
-		MaxAge:   0,
+		MaxAge:   -1, // net/http emits Max-Age=0; MaxAge: 0 would omit the attribute entirely
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
@@ -53,7 +53,7 @@ func clearCSRFCookie(w http.ResponseWriter, name string) {
 		Name:     name,
 		Value:    "",
 		Path:     "/",
-		MaxAge:   0,
+		MaxAge:   -1,
 		HttpOnly: false,
 		SameSite: http.SameSiteLaxMode,
 	})
