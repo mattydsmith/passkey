@@ -2,9 +2,9 @@ package passkey
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -70,7 +70,7 @@ func HandleSignInFinish(
 			RawID string `json:"rawId"`
 		}
 		if err := json.Unmarshal(body.Credential, &credRaw); err == nil && credRaw.RawID != "" {
-			rawID, decErr := decodeBase64URL(credRaw.RawID)
+			rawID, decErr := CredIDFromString(credRaw.RawID)
 			if decErr == nil {
 				if _, lookupErr := s.GetPasskey(rawID); lookupErr != nil {
 					if errors.Is(lookupErr, storage.ErrNotFound) {
@@ -90,25 +90,22 @@ func HandleSignInFinish(
 		}
 		parsedReq.Header.Set("Content-Type", "application/json")
 
+		var resolvedUserID string
 		cred, err := wa.FinishDiscoverableLogin(func(rawID, userHandle []byte) (webauthn.User, error) {
 			p, err := s.GetPasskey(rawID)
 			if err != nil {
 				return nil, err
 			}
+			resolvedUserID = p.UserID
 			return loadUser(s, p.UserID)
 		}, sess, parsedReq)
 		if err != nil {
 			writeJSONError(w, 401, "invalid_credential", err.Error())
 			return
 		}
-
-		// Look up the owning user via the credential.
-		p, err := s.GetPasskey(cred.ID)
-		if err != nil {
-			writeJSONError(w, 401, "invalid_credential", "credential not found")
-			return
+		if updateErr := s.UpdatePasskeySignCount(cred.ID, cred.Authenticator.SignCount, now()); updateErr != nil {
+			slog.Warn("passkey sign-count update failed", "err", updateErr)
 		}
-		_ = s.UpdatePasskeySignCount(cred.ID, cred.Authenticator.SignCount, now())
 
 		ua := r.Header.Get("User-Agent")
 		ip := r.Header.Get("X-Forwarded-For")
@@ -119,7 +116,7 @@ func HandleSignInFinish(
 		if ip != "" {
 			ipp = &ip
 		}
-		token, err := auth.CreateSession(s, p.UserID, sessionTTL, now(), uap, ipp)
+		token, err := auth.CreateSession(s, resolvedUserID, sessionTTL, now(), uap, ipp)
 		if err != nil {
 			writeJSONError(w, 500, "internal_error", err.Error())
 			return
@@ -129,16 +126,7 @@ func HandleSignInFinish(
 		}
 		writeJSON(w, 200, map[string]any{
 			"sessionToken": token,
-			"user":         map[string]string{"id": p.UserID, "email": ""},
+			"user":         map[string]string{"id": resolvedUserID, "email": ""},
 		})
 	}
-}
-
-// decodeBase64URL decodes a base64url string, tolerating both padded and
-// unpadded variants (and the standard base64 alphabet for robustness).
-func decodeBase64URL(s string) ([]byte, error) {
-	if b, err := base64.RawURLEncoding.DecodeString(s); err == nil {
-		return b, nil
-	}
-	return base64.URLEncoding.DecodeString(s)
 }

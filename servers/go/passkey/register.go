@@ -74,7 +74,7 @@ func HandleRegisterFinish(s storage.Storage, wa *webauthn.WebAuthn, pending *Pen
 		}
 		u, err := loadUser(s, userID)
 		if err != nil {
-			writeJSONError(w, 500, "internal_error", err.Error())
+			writeJSONError(w, 500, "internal_error", "Failed to load user")
 			return
 		}
 		parsedReq, err := http.NewRequest("POST", r.URL.String(), bytes.NewReader(body.Credential))
@@ -102,15 +102,4 @@ func HandleRegisterFinish(s storage.Storage, wa *webauthn.WebAuthn, pending *Pen
 		}
 		writeJSON(w, 200, map[string]string{"passkeyId": CredIDToString(cred.ID)})
 	}
-}
-
-// JSON helpers used across the package — kept here to avoid spreading them.
-func writeJSON(w http.ResponseWriter, status int, body any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
-}
-
-func writeJSONError(w http.ResponseWriter, status int, code, msg string) {
-	writeJSON(w, status, map[string]string{"error": code, "message": msg})
 }
