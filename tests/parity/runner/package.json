@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
@@ -12,10 +14,12 @@
   },
   "dependencies": {
     "playwright": "^1.45.0",
+    "tough-cookie": "^4.1.4",
     "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/tough-cookie": "^4.0.5",
     "tsx": "^4.7.0",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"
