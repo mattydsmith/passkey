@@ -7,36 +7,73 @@ import { tmpdir } from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
 const REPO_ROOT = resolve(__dirname, "..", "..", "..", "..");
-const HONO_APP_DIR = resolve(REPO_ROOT, "examples", "hono-app");
-const HONO_APP_ENTRY = resolve(HONO_APP_DIR, "src", "index.ts");
-const TSX_BIN = resolve(HONO_APP_DIR, "node_modules", ".bin", "tsx");
+
+export type ServerName = "ts" | "go";
 
 export interface ServerHandle {
   url: string;
   stop: () => Promise<void>;
 }
 
-export async function bootHonoApp(): Promise<ServerHandle> {
-  const port = await getFreePort();
-  const cwd = await mkdtemp(join(tmpdir(), "parity-hono-"));
+export async function bootServer(name: ServerName): Promise<ServerHandle> {
+  switch (name) {
+    case "ts":
+      return bootHonoApp();
+    case "go":
+      return bootGoApp();
+  }
+}
 
-  const child = spawn(TSX_BIN, [HONO_APP_ENTRY], {
+async function bootHonoApp(): Promise<ServerHandle> {
+  const HONO_APP_DIR = resolve(REPO_ROOT, "examples", "hono-app");
+  const HONO_APP_ENTRY = resolve(HONO_APP_DIR, "src", "index.ts");
+  const TSX_BIN = resolve(HONO_APP_DIR, "node_modules", ".bin", "tsx");
+  return bootSubprocess({
+    label: "hono-app",
+    cmd: TSX_BIN,
+    args: [HONO_APP_ENTRY],
+  });
+}
+
+async function bootGoApp(): Promise<ServerHandle> {
+  const GO_APP_DIR = resolve(REPO_ROOT, "examples", "go-app");
+  return bootSubprocess({
+    label: "go-app",
+    cmd: "go",
+    args: ["run", "."],
+    cwdOverride: GO_APP_DIR,
+  });
+}
+
+interface BootArgs {
+  label: string;
+  cmd: string;
+  args: string[];
+  cwdOverride?: string; // override the temp cwd if the binary needs to be invoked from its module dir
+}
+
+async function bootSubprocess(b: BootArgs): Promise<ServerHandle> {
+  const port = await getFreePort();
+  const tmpCwd = await mkdtemp(join(tmpdir(), `parity-${b.label}-`));
+  const cwd = b.cwdOverride ?? tmpCwd;
+
+  const child = spawn(b.cmd, b.args, {
     cwd,
     env: {
       ...process.env,
       NODE_ENV: "test",
       PORT: String(port),
       AUTH_ORIGINS: `http://localhost:${port}`,
+      // For Go: tells the binary to write its sqlite db into the temp dir
+      // (used in Phase 3+; harmless when the binary doesn't read it).
+      PASSKEY_DB_DIR: tmpCwd,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
 
   const stderrChunks: Buffer[] = [];
-  child.stdout?.on("data", () => {
-    /* drop in normal mode */
-  });
+  child.stdout?.on("data", () => {});
   child.stderr?.on("data", (c: Buffer) => stderrChunks.push(c));
 
   let exited = false;
@@ -46,18 +83,18 @@ export async function bootHonoApp(): Promise<ServerHandle> {
     if (!started && code !== 0 && signal === null) {
       const out = Buffer.concat(stderrChunks).toString();
       process.stderr.write(
-        `hono-app subprocess exited with code ${code}\n${out}\n`,
+        `${b.label} subprocess exited with code ${code}\n${out}\n`,
       );
     }
   });
 
   const url = `http://localhost:${port}`;
-  const deadline = Date.now() + 30_000;
+  const deadline = Date.now() + 60_000; // generous: go run cold-start
   while (Date.now() < deadline) {
     if (exited) {
-      await rm(cwd, { recursive: true, force: true });
+      await rm(tmpCwd, { recursive: true, force: true });
       throw new Error(
-        `hono-app subprocess exited before becoming reachable\n${Buffer.concat(stderrChunks).toString()}`,
+        `${b.label} subprocess exited before becoming reachable\n${Buffer.concat(stderrChunks).toString()}`,
       );
     }
     try {
@@ -66,7 +103,7 @@ export async function bootHonoApp(): Promise<ServerHandle> {
       });
       if (res.status > 0) {
         started = true;
-        return makeHandle(child, url, cwd);
+        return makeHandle(child, url, tmpCwd);
       }
     } catch {
       /* server not up yet */
@@ -75,8 +112,8 @@ export async function bootHonoApp(): Promise<ServerHandle> {
   }
 
   child.kill("SIGTERM");
-  await rm(cwd, { recursive: true, force: true });
-  throw new Error(`hono-app did not become reachable on ${url} within 30s`);
+  await rm(tmpCwd, { recursive: true, force: true });
+  throw new Error(`${b.label} did not become reachable on ${url} within 60s`);
 }
 
 function makeHandle(

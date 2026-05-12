@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { parseScenario, type Scenario } from "./scenario.js";
 import { runScenario, type RunOptions } from "./executor.js";
 import { WebAuthnHarness, closeBrowser } from "./webauthn.js";
-import { bootHonoApp, type ServerHandle } from "./server.js";
+import { bootServer, type ServerHandle, type ServerName } from "./server.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const VECTORS_DIR = resolve(__dirname, "..", "..", "vectors");
@@ -12,14 +12,22 @@ const VECTORS_DIR = resolve(__dirname, "..", "..", "vectors");
 interface CliArgs {
   url?: string;
   only?: string;
+  server: ServerName;
 }
 
 function parseArgs(argv: string[]): CliArgs {
-  const out: CliArgs = {};
+  const out: CliArgs = { server: "ts" };
   for (const a of argv) {
     if (a.startsWith("--url=")) out.url = a.slice(6);
     else if (a.startsWith("--only=")) out.only = a.slice(7);
-    else if (a === "--help" || a === "-h") {
+    else if (a.startsWith("--server=")) {
+      const v = a.slice(9);
+      if (v !== "ts" && v !== "go") {
+        console.error(`--server must be 'ts' or 'go', got: ${v}`);
+        process.exit(2);
+      }
+      out.server = v;
+    } else if (a === "--help" || a === "-h") {
       printHelp();
       process.exit(0);
     } else {
@@ -34,10 +42,12 @@ function parseArgs(argv: string[]): CliArgs {
 function printHelp(): void {
   console.log(
     [
-      "Usage: tsx src/index.ts [--url=<base>] [--only=<substring>]",
+      "Usage: tsx src/index.ts [--server=ts|go] [--url=<base>] [--only=<substring>]",
       "",
+      "  --server=ts|go     Which server implementation to boot. Default: ts.",
+      "                     Ignored when --url is given.",
       "  --url=<base>       Run vectors against an external server URL.",
-      "                     If omitted, boots examples/hono-app on a free port.",
+      "                     If omitted, boots the chosen example app.",
       "  --only=<sub>       Only run vectors whose path matches the substring.",
       "                     e.g. --only=email/verify",
       "",
@@ -128,10 +138,10 @@ async function main(): Promise<void> {
   if (args.url !== undefined) {
     baseUrl = args.url;
   } else {
-    console.error(`Booting hono-app...`);
-    server = await bootHonoApp();
+    console.error(`Booting ${args.server}-app...`);
+    server = await bootServer(args.server);
     baseUrl = server.url;
-    console.error(`hono-app ready on ${baseUrl}`);
+    console.error(`${args.server}-app ready on ${baseUrl}`);
   }
 
   const origin = new URL(baseUrl).origin;
