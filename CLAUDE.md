@@ -8,7 +8,7 @@ Personal multi-package SDK at `/Users/mattsmith/Documents/Dev/SDKs/Passkey`. pnp
 
 ## Workflow
 
-- **Work directly on `main`.** This is a single-dev personal repo; the user explicitly authorized direct-to-main commits during Phase 1 and the convention has held since. There is no separate feature-branch workflow and no PR process.
+- **Use feature branches for new work.** The earlier convention was direct-to-main, but the user lost a chunk of work when an unpushed worktree was cleared, so any non-trivial change now branches off `main` (e.g. `feat/<topic>`) and merges back when complete. Push the branch to `origin` early so it survives a workspace wipe; one-line typo-style edits can still go straight to `main` if the user OKs it in the moment.
 - **Remote is `origin` → `github.com/mattydsmith/passkey.git`.** Push only when the user explicitly asks. GitHub blocks pushes that expose the real email; commits must use the noreply variant `231002+mattydsmith@users.noreply.github.com`. The main repo's local git config pins this; the global config still has the real email, so worktrees inherit the wrong value — set the local override on any new clone before committing.
 - **No `Co-Authored-By: Claude …` trailer in commit messages** unless the user explicitly asks for it. Plan-prescribed commit messages are the canonical wording.
 - **One commit per task** when executing a written plan. Conventional commit prefixes (`feat:`, `fix:`, `test:`, `docs:`, `chore:`).
