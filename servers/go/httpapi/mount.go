@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/mattydsmith/passkey/servers/go/auth"
+	"github.com/mattydsmith/passkey/servers/go/passkey"
 )
 
 // Mount wires the SDK's auth routes onto r. The full route set is added in
@@ -45,6 +47,29 @@ func Mount(r chi.Router, cfg Config) error {
 		r.Get("/me", handleMe(cfg))
 		r.Post("/sign-out", handleSignOut(cfg))
 		r.Get("/sessions", handleListSessions(cfg))
+
+		// Passkey ceremonies + management
+		wa, err := passkey.NewProvider(cfg.RPID, cfg.RPName, cfg.Origins)
+		if err != nil {
+			slog.Error("passkey provider init failed", "err", err)
+		} else {
+			pendingReg := passkey.NewPendingRegistrations()
+			pendingSign := passkey.NewPendingSignIns()
+			r.Post("/passkey/register/start",
+				passkey.HandleRegisterStart(cfg.Storage, wa, pendingReg, cfg.SessionCookieName, cfg.Now))
+			r.Post("/passkey/register/finish",
+				passkey.HandleRegisterFinish(cfg.Storage, wa, pendingReg, cfg.SessionCookieName, cfg.Now))
+			r.Post("/passkey/sign-in/start",
+				passkey.HandleSignInStart(cfg.Storage, wa, pendingSign))
+			r.Post("/passkey/sign-in/finish",
+				passkey.HandleSignInFinish(
+					cfg.Storage, wa, pendingSign, cfg.SessionTTL,
+					cfg.SessionCookieName, cfg.CSRFCookieName, cfg.Now,
+					setSessionCookie, setCSRFCookie,
+				))
+			r.Get("/passkeys", passkey.HandleListPasskeys(cfg.Storage, cfg.SessionCookieName, cfg.Now))
+			r.Delete("/passkeys/{id}", passkey.HandleDeletePasskey(cfg.Storage, cfg.SessionCookieName, cfg.Now))
+		}
 	})
 	return nil
 }
