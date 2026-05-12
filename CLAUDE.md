@@ -4,11 +4,11 @@ This file codifies the conventions established during Phases 1–3 and the parit
 
 ## Project shape
 
-Personal multi-package SDK at `/Users/mattsmith/Documents/Dev/SDKs/Passkey`. pnpm workspace, four packages (`core`, `hono`, `cli`, `client-web`) plus two examples (`hono-app`, `web-demo`) plus a Swift Package (`clients/PasskeySDK`) and a SwiftUI demo (`clients/ios-demo`). Phases 1 (TS server), 2 (web client + cookie-mode prereqs), and 3 (Swift/iOS client) are all shipped. A cross-implementation HTTP parity suite at `tests/parity/` ships alongside.
+Personal multi-package SDK at `/Users/mattsmith/Documents/Dev/SDKs/Passkey`. pnpm workspace, four packages (`core`, `hono`, `cli`, `client-web`) plus three examples (`hono-app`, `web-demo`, `go-app`) plus a Swift Package (`clients/PasskeySDK`) and a SwiftUI demo (`clients/ios-demo`) plus a Go server SDK (`servers/go/`). Phases 1 (TS server), 2 (web client + cookie-mode prereqs), 3 (Swift/iOS client), and 4 (Go server) are all shipped. The TS and Go servers are peer implementations of the same HTTP contract; the cross-implementation parity suite at `tests/parity/` enforces lockstep via a CI matrix that runs `pnpm test:parity --server={ts,go}` on every push.
 
 ## Workflow
 
-- **Work directly on `main`.** This is a single-dev personal repo; the user explicitly authorized direct-to-main commits during Phase 1 and the convention has held since. There is no separate feature-branch workflow and no PR process.
+- **Use feature branches for new work.** The earlier convention was direct-to-main, but the user lost a chunk of work when an unpushed worktree was cleared, so any non-trivial change now branches off `main` (e.g. `feat/<topic>`) and merges back when complete. Push the branch to `origin` early so it survives a workspace wipe; one-line typo-style edits can still go straight to `main` if the user OKs it in the moment.
 - **Remote is `origin` → `github.com/mattydsmith/passkey.git`.** Push only when the user explicitly asks. GitHub blocks pushes that expose the real email; commits must use the noreply variant `231002+mattydsmith@users.noreply.github.com`. The main repo's local git config pins this; the global config still has the real email, so worktrees inherit the wrong value — set the local override on any new clone before committing.
 - **No `Co-Authored-By: Claude …` trailer in commit messages** unless the user explicitly asks for it. Plan-prescribed commit messages are the canonical wording.
 - **One commit per task** when executing a written plan. Conventional commit prefixes (`feat:`, `fix:`, `test:`, `docs:`, `chore:`).
@@ -39,7 +39,9 @@ pnpm typecheck       # tsc --noEmit per package
 pnpm test            # vitest in core + hono + client-web
 pnpm --filter hono-app-example test     # server e2e via app.request
 pnpm --filter web-demo-example test     # Playwright e2e (needs Chromium installed)
-pnpm test:parity     # vitest self-tests + auto-boot hono-app + run all 20 conformance vectors
+pnpm test:parity                        # auto-boots examples/hono-app (--server=ts default), runs all 20 conformance vectors
+pnpm test:parity --server=go            # auto-boots examples/go-app (compiles via `go run`), runs all 20 conformance vectors
+( cd servers/go && go test ./... )      # Go server unit tests (auth + storage + passkey)
 ```
 
 The parity runner lives outside the pnpm workspace at `tests/parity/runner/`. First time on a clone, install its deps separately:
@@ -49,6 +51,8 @@ The parity runner lives outside the pnpm workspace at `tests/parity/runner/`. Fi
 ```
 
 `pnpm test:parity` will fail with "vitest: command not found" if you skip that step.
+
+For the Go side, run `go work sync` once on a fresh clone to wire `servers/go` and `examples/go-app` into the top-level `go.work`. The first `pnpm test:parity --server=go` after a clean cache pays a `go run` cold-start cost (~5s); subsequent runs reuse the build cache.
 
 ## Build pipeline gotchas
 

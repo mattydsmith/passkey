@@ -1,0 +1,49 @@
+name: parity
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  parity:
+    name: parity-${{ matrix.server }}
+    strategy:
+      fail-fast: false
+      matrix:
+        server: [ts, go]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install workspace deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build TS packages
+        run: pnpm build
+
+      - uses: actions/setup-go@v5
+        if: matrix.server == 'go'
+        with:
+          go-version: "1.22"
+
+      - name: Sync Go workspace
+        if: matrix.server == 'go'
+        run: go work sync
+
+      - name: Install parity runner deps
+        run: cd tests/parity/runner && pnpm install --ignore-workspace --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: cd tests/parity/runner && pnpm exec playwright install --with-deps chromium
+
+      - name: Run parity suite (--server=${{ matrix.server }})
+        run: pnpm test:parity --server=${{ matrix.server }}
