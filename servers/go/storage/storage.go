@@ -33,7 +33,7 @@ type Passkey struct {
 	UserID       string
 	PublicKey    []byte
 	SignCount    uint32
-	Transports   *string // comma-separated, matches TS
+	Transports   *string // JSON-encoded []string, matches TS wire format (e.g. `["usb","nfc"]`)
 	AAGUID       []byte
 	DeviceName   *string
 	CreatedAt    time.Time
