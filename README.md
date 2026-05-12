@@ -107,6 +107,10 @@ Passkey/
 ├── examples/
 │   ├── hono-app/                 # Reference server
 │   └── web-demo/                 # Reference web client + Playwright e2e
+├── tests/
+│   └── parity/                   # Cross-implementation HTTP conformance suite
+│       ├── runner/               #   Node CLI (vitest self-tests + scenario runner)
+│       └── vectors/              #   JSON scenarios — one per protocol behavior
 └── docs/superpowers/
     ├── specs/                    # Design specs
     ├── plans/                    # Implementation plans
@@ -128,6 +132,16 @@ Per-example tests:
 pnpm --filter hono-app-example test     # 3 tests (server e2e via app.request)
 pnpm --filter web-demo-example test     # Playwright e2e (needs port 3001 free; uses NODE_ENV=test internally)
 ```
+
+Conformance suite (spec/protocol.md → vectors):
+
+```bash
+pnpm test:parity     # vitest self-tests + auto-boot hono-app + run every vector
+```
+
+See [`tests/parity/README.md`](tests/parity/README.md) for the vector format,
+how to add a new scenario, and how to point the runner at a non-reference
+server with `--url`.
 
 Run the reference server:
 

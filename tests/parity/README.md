@@ -39,37 +39,47 @@ pnpm install --ignore-workspace
 pnpm exec playwright install chromium  # only if not already cached for v1.59.1
 ```
 
-## Running the runner's own tests
+## Running the full suite
+
+From the repo root, after `pnpm install` and `pnpm build`:
 
 ```bash
-pnpm test:parity        # from repo root, or:
-cd tests/parity/runner && pnpm test
+pnpm test:parity
 ```
 
-That runs the runner's vitest self-tests (matchers, transport, harness,
-executor). It does not require hono-app to be running.
+That runs (in order):
 
-## Verifying a vector against a live server
+1. the runner's vitest self-tests (matchers, transport, harness, executor),
+2. an auto-booted instance of `examples/hono-app` on an ephemeral port,
+3. every vector in `vectors/**/*.json`, against that server,
+4. a pass/fail summary; non-zero exit if any vector failed.
 
-Boot `examples/hono-app` with the test routes enabled, then point the
-verifier at it:
+The auto-boot spawns `tsx examples/hono-app/src/index.ts` with
+`NODE_ENV=test`, `PORT=<ephemeral>`, and `AUTH_ORIGINS=http://localhost:<port>`,
+in a temp dir so each run starts with a fresh SQLite DB. The subprocess
+is torn down (and the temp dir removed) on exit.
+
+## Filtering and external targets
+
+The CLI behind `pnpm test:parity` is `tests/parity/runner/src/index.ts`:
 
 ```bash
-# in one terminal
-cd examples/hono-app && NODE_ENV=test PORT=3001 pnpm start
-
-# in another terminal
 cd tests/parity/runner
-pnpm exec tsx scripts/verify-vector.ts --url=http://localhost:3001 \
-  ../vectors/email/start-happy.json \
-  ../vectors/email/verify-happy.json
+
+pnpm test:e2e -- --only=email/verify    # run only matching vector paths
+pnpm test:e2e -- --url=http://...       # skip auto-boot; target an external server
 ```
 
-The default `--url` is `http://localhost:3001`. Each vector reports
-`PASS` or `FAIL <reason>`; non-zero exit on any failure.
+`--url` is how a future second implementation (e.g. a Go server) is
+test-driven against the same vectors.
 
-> Task 11 will replace this manual workflow with a single `pnpm test:parity`
-> that boots hono-app, discovers all vectors, and reports a summary.
+For ad-hoc verification of one or two vectors against a hand-booted
+server, `scripts/verify-vector.ts` is also there:
+
+```bash
+pnpm exec tsx scripts/verify-vector.ts --url=http://localhost:3001 \
+  ../vectors/email/start-happy.json
+```
 
 ## Vector file format
 
