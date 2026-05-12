@@ -7,7 +7,8 @@
   "scripts": {
     "build": "pnpm -r --filter './packages/*' build",
     "test": "pnpm -r --filter './packages/*' test",
-    "typecheck": "pnpm -r --filter './packages/*' typecheck"
+    "typecheck": "pnpm -r --filter './packages/*' typecheck",
+    "test:parity": "cd tests/parity/runner && pnpm test"
   },
   "devDependencies": {
     "typescript": "^5.4.0"
