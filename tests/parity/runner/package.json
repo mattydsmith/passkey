@@ -9,6 +9,8 @@
   "scripts": {
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
+    "test:e2e": "tsx src/index.ts",
+    "test:all": "pnpm test && pnpm test:e2e",
     "typecheck": "tsc --noEmit",
     "start": "tsx src/index.ts"
   },

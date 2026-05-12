@@ -20,14 +20,17 @@ db.exec(`
 
 const lastOtps = new Map<string, string>();
 
+const defaultOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:3001",
+];
 const auth = createAuth(
   {
     rpId: "localhost",
-    origins: [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "http://localhost:3001",
-    ],
+    origins: process.env.AUTH_ORIGINS
+      ? process.env.AUTH_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean)
+      : defaultOrigins,
     session: { lifetimeSeconds: 60 * 60 * 24 * 30, cookieName: "session" },
     email: {
       sendOtp: async ({ to, code }) => {
