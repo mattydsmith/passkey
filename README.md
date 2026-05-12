@@ -1,18 +1,25 @@
 # Passkey SDK
 
-Email-OTP + passkey authentication for personal projects. Self-contained, SQLite-backed, multi-platform. One npm install (or Swift Package add) and a few lines of config to drop passwordless auth into a project — no external auth service required at runtime.
+Self-hosted email-OTP + passkey authentication for personal apps. Drop a few packages into a Hono server, point a web or iOS client at it, and you have passwordless sign-in backed by SQLite — no external auth service required at runtime.
 
-The defining constraint is **multi-platform from day one**: a single project's backend can serve both a web client and a native Apple-platform client, both of which register and authenticate passkeys against the same user accounts.
+The defining constraint is **multi-platform from day one**: a single project's backend serves both a web client and a native Apple-platform client, both of which register and authenticate passkeys against the same user accounts.
+
+## Features
+
+- **Email OTP + WebAuthn passkeys.** First sign-in by emailed code; every subsequent device by passkey.
+- **SQLite-backed.** No Postgres, no Redis, no third-party auth provider. A single `.db` file per environment.
+- **One HTTP contract.** Every client implements [`spec/protocol.md`](spec/protocol.md); swap clients without touching the server.
+- **Cookie or bearer sessions.** Cookies (with built-in CSRF middleware) for the web; bearer tokens for iOS.
+- **Zero-runtime-dep web client.** Just `fetch`, `navigator.credentials`, `localStorage`, `document.cookie`.
+- **Native iOS / macOS Swift Package.** `URLSession` + `AuthenticationServices` + Keychain.
 
 ## Status
+
+> **Personal project.** Built for one developer's apps. Nothing published to npm or SwiftPM yet — consumed via workspace links and SwiftPM path dependencies. No public stability guarantees. Code is here to read, fork, and learn from.
 
 - **Phase 1 — TypeScript server:** shipped (`packages/core`, `packages/hono`, `packages/cli`).
 - **Phase 2 — Web client:** shipped (`packages/client-web`) plus cookie-mode prerequisites on the server (CSRF middleware, `Secure` cookies, threaded `Max-Age`).
 - **Phase 3 — Swift / iOS client:** shipped (`clients/PasskeySDK`) plus a SwiftUI demo (`clients/ios-demo`).
-
-The HTTP contract at [`spec/protocol.md`](spec/protocol.md) is the durable artifact every package implements or consumes.
-
-Nothing is published to npm yet. This is a personal SDK consumed via workspace links.
 
 ## Packages
 
