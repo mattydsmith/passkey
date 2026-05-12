@@ -127,6 +127,9 @@ func (s *sqliteStore) ListSessions(userID string) ([]Session, error) {
 		}
 		out = append(out, sess)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -212,7 +215,7 @@ func (s *sqliteStore) CreatePasskey(p Passkey) error {
 		`INSERT INTO auth_passkeys (credential_id, user_id, public_key, sign_count, transports, aaguid, device_name, created_at, last_used_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		p.CredentialID, p.UserID, p.PublicKey, p.SignCount,
-		nullStr(p.Transports), p.AAGUID, nullStr(p.DeviceName),
+		nullStr(p.Transports), nullBytes(p.AAGUID), nullStr(p.DeviceName),
 		p.CreatedAt.Unix(), lastUsed,
 	)
 	return err
@@ -230,7 +233,7 @@ func (s *sqliteStore) GetPasskey(credentialID []byte) (*Passkey, error) {
 func (s *sqliteStore) ListPasskeys(userID string) ([]Passkey, error) {
 	rows, err := s.db.Query(
 		`SELECT credential_id, user_id, public_key, sign_count, transports, aaguid, device_name, created_at, last_used_at
-		 FROM auth_passkeys WHERE user_id = ? ORDER BY created_at ASC`,
+		 FROM auth_passkeys WHERE user_id = ? ORDER BY created_at DESC`,
 		userID,
 	)
 	if err != nil {
@@ -244,6 +247,9 @@ func (s *sqliteStore) ListPasskeys(userID string) ([]Passkey, error) {
 			return nil, err
 		}
 		out = append(out, *p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -268,7 +274,7 @@ func (s *sqliteStore) DeletePasskey(credentialID []byte) error {
 // --- helpers -----------------------------------------------------------------
 
 type rowScanner interface {
-	Scan(dest ...interface{}) error
+	Scan(dest ...any) error
 }
 
 func scanPasskey(row rowScanner) (*Passkey, error) {
@@ -298,9 +304,19 @@ func scanPasskey(row rowScanner) (*Passkey, error) {
 	return &p, nil
 }
 
-func nullStr(p *string) interface{} {
+func nullStr(p *string) any {
 	if p == nil {
 		return nil
 	}
 	return *p
+}
+
+// nullBytes converts a possibly-empty []byte into a SQL NULL when it has no
+// content. Without this, an empty slice writes an empty BLOB (X''), which
+// is distinct from NULL and won't round-trip as "absent".
+func nullBytes(b []byte) any {
+	if len(b) == 0 {
+		return nil
+	}
+	return b
 }
