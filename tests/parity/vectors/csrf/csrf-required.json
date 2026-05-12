@@ -1,0 +1,43 @@
+{
+  "name": "csrf/csrf-required",
+  "mode": "cookie",
+  "steps": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/start",
+        "body": { "email": "parity-csrf-required@example.com" }
+      },
+      "expect": { "status": 200 },
+      "capture": { "otpId": "$.body.otpId" }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/__test/last-otp?email=parity-csrf-required@example.com"
+      },
+      "expect": { "status": 200 },
+      "capture": { "code": "$.body.code" }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/verify",
+        "body": { "otpId": "{{otpId}}", "code": "{{code}}" }
+      },
+      "expect": { "status": 200 }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/sign-out",
+        "body": {},
+        "omitCsrf": true
+      },
+      "expect": {
+        "status": 403,
+        "body": { "error": "csrf_required" }
+      }
+    }
+  ]
+}

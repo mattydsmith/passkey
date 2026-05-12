@@ -1,0 +1,62 @@
+{
+  "name": "csrf/cookie-mode-happy",
+  "mode": "cookie",
+  "steps": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/start",
+        "body": { "email": "parity-cookie-happy@example.com" }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "otpId": { "type": "string", "nonEmpty": true },
+          "expiresInSeconds": { "type": "number", "min": 1 }
+        }
+      },
+      "capture": { "otpId": "$.body.otpId" }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/__test/last-otp?email=parity-cookie-happy@example.com"
+      },
+      "expect": { "status": 200 },
+      "capture": { "code": "$.body.code" }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/verify",
+        "body": { "otpId": "{{otpId}}", "code": "{{code}}" }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "sessionToken": { "type": "string", "nonEmpty": true },
+          "user": {
+            "id": { "type": "string", "nonEmpty": true },
+            "email": { "const": "parity-cookie-happy@example.com" }
+          }
+        }
+      }
+    },
+    {
+      "request": { "method": "GET", "path": "/auth/me" },
+      "expect": {
+        "status": 200,
+        "body": {
+          "user": {
+            "id": { "type": "string", "nonEmpty": true },
+            "email": { "type": "string" }
+          }
+        }
+      }
+    },
+    {
+      "request": { "method": "POST", "path": "/auth/sign-out", "body": {} },
+      "expect": { "status": 200, "body": { "ok": { "const": true } } }
+    }
+  ]
+}

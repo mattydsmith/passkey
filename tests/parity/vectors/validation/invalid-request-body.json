@@ -1,0 +1,17 @@
+{
+  "name": "validation/invalid-request-body",
+  "mode": "bearer",
+  "steps": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/start",
+        "body": {}
+      },
+      "expect": {
+        "status": 400,
+        "body": { "error": "invalid_request" }
+      }
+    }
+  ]
+}
