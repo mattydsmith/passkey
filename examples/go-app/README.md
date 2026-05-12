@@ -1,7 +1,8 @@
 # go-app example
 
-Thin binary that mounts the `servers/go` library and listens on `$PORT`. The
-parity runner auto-boots this when invoked with `pnpm test:parity --server=go`.
+Thin binary that mounts the `servers/go` library and listens on `$PORT`. After
+Phase 2, the parity runner auto-boots this when invoked with
+`pnpm test:parity --server=go`.
 
 ## Run locally
 

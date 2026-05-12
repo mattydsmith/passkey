@@ -6,8 +6,8 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// Mount wires the SDK's auth routes onto r under /auth. Currently a no-op;
-// individual routes are added in later phases.
+// Mount wires the SDK's auth routes onto r. The full route set is added in
+// later phases; Phase 1 only registers /healthz at the router root.
 func Mount(r chi.Router, cfg Config) error {
 	if cfg.Storage == nil {
 		return ErrStorageRequired

@@ -11,7 +11,8 @@ playwright-report/
 .claude/
 
 # Go build outputs
-/go-app
+go-app
+!examples/go-app/
 go.work.sum
 
 # Swift / Xcode

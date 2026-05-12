@@ -1,6 +1,6 @@
-// Package main runs an HTTP server that mounts the Passkey SDK Go server
-// at /auth. Honors PORT, AUTH_ORIGINS, RP_ID. NODE_ENV=test additionally
-// enables /__test/* routes (added in Phase 3).
+// Package main runs an HTTP server that mounts the Passkey SDK Go server.
+// Honors PORT, AUTH_ORIGINS, RP_ID. Phase 1 registers /healthz at the root;
+// /auth/* and /__test/* routes are added in later phases.
 package main
 
 import (
