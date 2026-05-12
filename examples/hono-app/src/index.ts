@@ -77,6 +77,25 @@ if (process.env.NODE_ENV === "test") {
     if (!code) return c.json({ error: "no_otp_for_email" }, 404);
     return c.json({ code });
   });
+
+  // Test-only: forcibly age out a single OTP row so the next /auth/email/verify
+  // returns `otp_expired`. Used by the parity suite's verify-expired vector.
+  app.post("/__test/force-expire-otp", async (c) => {
+    if (process.env.NODE_ENV !== "test") {
+      return c.json({ error: "not_found" }, 404);
+    }
+    const body = (await c.req.json().catch(() => null)) as
+      | { otpId?: unknown }
+      | null;
+    const otpId = body && typeof body.otpId === "string" ? body.otpId : null;
+    if (otpId === null) {
+      return c.json({ error: "missing_otpId" }, 400);
+    }
+    db.prepare("UPDATE auth_email_otps SET expires_at = 0 WHERE id = ?").run(
+      otpId
+    );
+    return c.json({ ok: true });
+  });
 }
 
 app.get("/.well-known/apple-app-site-association", (c) =>

@@ -1,0 +1,32 @@
+{
+  "name": "email/verify-invalid-otp",
+  "mode": "bearer",
+  "steps": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/start",
+        "body": { "email": "parity-invalid-otp@example.com" }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "otpId": { "type": "string", "nonEmpty": true },
+          "expiresInSeconds": { "type": "number", "min": 1 }
+        }
+      },
+      "capture": { "otpId": "$.body.otpId" }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/verify",
+        "body": { "otpId": "{{otpId}}", "code": "000000" }
+      },
+      "expect": {
+        "status": 401,
+        "body": { "error": "invalid_otp" }
+      }
+    }
+  ]
+}

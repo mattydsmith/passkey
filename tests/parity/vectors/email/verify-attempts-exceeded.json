@@ -1,0 +1,66 @@
+{
+  "name": "email/verify-attempts-exceeded",
+  "mode": "bearer",
+  "steps": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/start",
+        "body": { "email": "parity-attempts-exceeded@example.com" }
+      },
+      "expect": { "status": 200 },
+      "capture": { "otpId": "$.body.otpId" }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/verify",
+        "body": { "otpId": "{{otpId}}", "code": "000000" }
+      },
+      "expect": { "status": 401, "body": { "error": "invalid_otp" } }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/verify",
+        "body": { "otpId": "{{otpId}}", "code": "000001" }
+      },
+      "expect": { "status": 401, "body": { "error": "invalid_otp" } }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/verify",
+        "body": { "otpId": "{{otpId}}", "code": "000002" }
+      },
+      "expect": { "status": 401, "body": { "error": "invalid_otp" } }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/verify",
+        "body": { "otpId": "{{otpId}}", "code": "000003" }
+      },
+      "expect": { "status": 401, "body": { "error": "invalid_otp" } }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/verify",
+        "body": { "otpId": "{{otpId}}", "code": "000004" }
+      },
+      "expect": { "status": 401, "body": { "error": "invalid_otp" } }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/verify",
+        "body": { "otpId": "{{otpId}}", "code": "000005" }
+      },
+      "expect": {
+        "status": 429,
+        "body": { "error": "otp_attempts_exceeded" }
+      }
+    }
+  ]
+}

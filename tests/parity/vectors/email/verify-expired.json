@@ -1,0 +1,34 @@
+{
+  "name": "email/verify-expired",
+  "mode": "bearer",
+  "steps": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/start",
+        "body": { "email": "parity-expired@example.com" }
+      },
+      "expect": { "status": 200 },
+      "capture": { "otpId": "$.body.otpId" }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/__test/force-expire-otp",
+        "body": { "otpId": "{{otpId}}" }
+      },
+      "expect": { "status": 200, "body": { "ok": { "const": true } } }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/verify",
+        "body": { "otpId": "{{otpId}}", "code": "000000" }
+      },
+      "expect": {
+        "status": 410,
+        "body": { "error": "otp_expired" }
+      }
+    }
+  ]
+}
