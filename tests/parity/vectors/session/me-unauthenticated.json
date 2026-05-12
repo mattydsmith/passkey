@@ -1,0 +1,13 @@
+{
+  "name": "session/me-unauthenticated",
+  "mode": "bearer",
+  "steps": [
+    {
+      "request": { "method": "GET", "path": "/auth/me" },
+      "expect": {
+        "status": 401,
+        "body": { "error": "unauthenticated" }
+      }
+    }
+  ]
+}

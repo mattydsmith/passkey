@@ -1,0 +1,49 @@
+{
+  "name": "session/list-sessions",
+  "mode": "bearer",
+  "steps": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/start",
+        "body": { "email": "parity-list-sessions@example.com" }
+      },
+      "expect": { "status": 200 },
+      "capture": { "otpId": "$.body.otpId" }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/__test/last-otp?email=parity-list-sessions@example.com"
+      },
+      "expect": { "status": 200 },
+      "capture": { "code": "$.body.code" }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/verify",
+        "body": { "otpId": "{{otpId}}", "code": "{{code}}" }
+      },
+      "expect": { "status": 200 }
+    },
+    {
+      "request": { "method": "GET", "path": "/auth/sessions" },
+      "expect": {
+        "status": 200,
+        "body": {
+          "sessions": {
+            "array": {
+              "minLength": 1,
+              "items": {
+                "createdAt": { "type": "number", "min": 0 },
+                "expiresAt": { "type": "number", "min": 0 },
+                "lastSeenAt": { "type": "number", "min": 0 }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

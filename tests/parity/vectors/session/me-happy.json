@@ -1,0 +1,43 @@
+{
+  "name": "session/me-happy",
+  "mode": "bearer",
+  "steps": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/start",
+        "body": { "email": "parity-me-happy@example.com" }
+      },
+      "expect": { "status": 200 },
+      "capture": { "otpId": "$.body.otpId" }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/__test/last-otp?email=parity-me-happy@example.com"
+      },
+      "expect": { "status": 200 },
+      "capture": { "code": "$.body.code" }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/auth/email/verify",
+        "body": { "otpId": "{{otpId}}", "code": "{{code}}" }
+      },
+      "expect": { "status": 200 }
+    },
+    {
+      "request": { "method": "GET", "path": "/auth/me" },
+      "expect": {
+        "status": 200,
+        "body": {
+          "user": {
+            "id": { "type": "string", "nonEmpty": true },
+            "email": { "type": "string" }
+          }
+        }
+      }
+    }
+  ]
+}
