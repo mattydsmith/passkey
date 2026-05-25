@@ -212,10 +212,11 @@ func (s *sqliteStore) CreatePasskey(p Passkey) error {
 		lastUsed.Valid = true
 	}
 	_, err := s.db.Exec(
-		`INSERT INTO auth_passkeys (credential_id, user_id, public_key, sign_count, transports, aaguid, device_name, created_at, last_used_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO auth_passkeys (credential_id, user_id, public_key, sign_count, transports, aaguid, device_name, backup_eligible, backup_state, created_at, last_used_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		p.CredentialID, p.UserID, p.PublicKey, p.SignCount,
 		nullStr(p.Transports), nullBytes(p.AAGUID), nullStr(p.DeviceName),
+		p.BackupEligible, p.BackupState,
 		p.CreatedAt.Unix(), lastUsed,
 	)
 	return err
@@ -223,7 +224,7 @@ func (s *sqliteStore) CreatePasskey(p Passkey) error {
 
 func (s *sqliteStore) GetPasskey(credentialID []byte) (*Passkey, error) {
 	row := s.db.QueryRow(
-		`SELECT credential_id, user_id, public_key, sign_count, transports, aaguid, device_name, created_at, last_used_at
+		`SELECT credential_id, user_id, public_key, sign_count, transports, aaguid, device_name, backup_eligible, backup_state, created_at, last_used_at
 		 FROM auth_passkeys WHERE credential_id = ?`,
 		credentialID,
 	)
@@ -232,7 +233,7 @@ func (s *sqliteStore) GetPasskey(credentialID []byte) (*Passkey, error) {
 
 func (s *sqliteStore) ListPasskeys(userID string) ([]Passkey, error) {
 	rows, err := s.db.Query(
-		`SELECT credential_id, user_id, public_key, sign_count, transports, aaguid, device_name, created_at, last_used_at
+		`SELECT credential_id, user_id, public_key, sign_count, transports, aaguid, device_name, backup_eligible, backup_state, created_at, last_used_at
 		 FROM auth_passkeys WHERE user_id = ? ORDER BY created_at DESC`,
 		userID,
 	)
@@ -282,7 +283,7 @@ func scanPasskey(row rowScanner) (*Passkey, error) {
 	var transports, deviceName sql.NullString
 	var createdAt int64
 	var lastUsedAt sql.NullInt64
-	if err := row.Scan(&p.CredentialID, &p.UserID, &p.PublicKey, &p.SignCount, &transports, &p.AAGUID, &deviceName, &createdAt, &lastUsedAt); err != nil {
+	if err := row.Scan(&p.CredentialID, &p.UserID, &p.PublicKey, &p.SignCount, &transports, &p.AAGUID, &deviceName, &p.BackupEligible, &p.BackupState, &createdAt, &lastUsedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}

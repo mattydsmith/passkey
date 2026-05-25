@@ -2,6 +2,8 @@ package storage
 
 import (
 	"database/sql"
+	"io/fs"
+	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -47,11 +49,24 @@ func TestRunMigrations_Idempotent(t *testing.T) {
 		t.Fatalf("re-run failed: %v", err)
 	}
 
+	// auth_migrations row count must match the number of bundled SQL files —
+	// derive it from the embedded FS so new migrations don't break this test.
+	entries, err := fs.ReadDir(migrationsFS, "migrations")
+	if err != nil {
+		t.Fatalf("read migrations: %v", err)
+	}
+	want := 0
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql") {
+			want++
+		}
+	}
+
 	var count int
 	if err := db.QueryRow("SELECT COUNT(*) FROM auth_migrations").Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 1 {
-		t.Errorf("auth_migrations row count = %d, want 1", count)
+	if count != want {
+		t.Errorf("auth_migrations row count = %d, want %d", count, want)
 	}
 }

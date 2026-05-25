@@ -89,13 +89,15 @@ func HandleRegisterFinish(s storage.Storage, wa *webauthn.WebAuthn, pending *Pen
 			return
 		}
 		if err := s.CreatePasskey(storage.Passkey{
-			CredentialID: cred.ID,
-			UserID:       userID,
-			PublicKey:    cred.PublicKey,
-			SignCount:    cred.Authenticator.SignCount,
-			AAGUID:       cred.Authenticator.AAGUID,
-			DeviceName:   body.DeviceName,
-			CreatedAt:    now(),
+			CredentialID:   cred.ID,
+			UserID:         userID,
+			PublicKey:      cred.PublicKey,
+			SignCount:      cred.Authenticator.SignCount,
+			AAGUID:         cred.Authenticator.AAGUID,
+			DeviceName:     body.DeviceName,
+			BackupEligible: cred.Flags.BackupEligible,
+			BackupState:    cred.Flags.BackupState,
+			CreatedAt:      now(),
 		}); err != nil {
 			writeJSONError(w, 500, "internal_error", err.Error())
 			return

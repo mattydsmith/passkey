@@ -32,6 +32,15 @@ func loadUser(s storage.Storage, userID string) (*sdkUser, error) {
 				AAGUID:    p.AAGUID,
 				SignCount: p.SignCount,
 			},
+			// go-webauthn compares the asserted BackupEligible flag against
+			// the stored value on every login (webauthn/login.go:371). If we
+			// leave Flags zero-valued here, every synced-passkey assertion
+			// (BE=1) fails against the zero (BE=0) with "Backup Eligible flag
+			// inconsistency detected during login validation".
+			Flags: webauthn.CredentialFlags{
+				BackupEligible: p.BackupEligible,
+				BackupState:    p.BackupState,
+			},
 		})
 	}
 	return u, nil

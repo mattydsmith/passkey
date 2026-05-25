@@ -90,22 +90,26 @@ func TestSQLite_PasskeyLifecycle(t *testing.T) {
 	deviceName := "MacBook"
 
 	// Two passkeys, with and without nullable fields, to exercise both paths.
+	// pk1 carries BE=true,BS=true (synced authenticator like iCloud Keychain);
+	// pk2 leaves both flags zero (platform-only / security-key shape).
 	pk1 := Passkey{
-		CredentialID: credID,
-		UserID:       "user-1",
-		PublicKey:    []byte{0x01, 0x02},
-		SignCount:    0,
-		Transports:   &transports,
-		AAGUID:       []byte{0x10, 0x20, 0x30},
-		DeviceName:   &deviceName,
-		CreatedAt:    now,
+		CredentialID:   credID,
+		UserID:         "user-1",
+		PublicKey:      []byte{0x01, 0x02},
+		SignCount:      0,
+		Transports:     &transports,
+		AAGUID:         []byte{0x10, 0x20, 0x30},
+		DeviceName:     &deviceName,
+		BackupEligible: true,
+		BackupState:    true,
+		CreatedAt:      now,
 	}
 	pk2 := Passkey{
 		CredentialID: []byte{0xCA, 0xFE},
 		UserID:       "user-1",
 		PublicKey:    []byte{0x03, 0x04},
 		SignCount:    7,
-		// Transports, AAGUID (empty slice), DeviceName all absent.
+		// Transports, AAGUID (empty slice), DeviceName, Backup* all absent.
 		AAGUID:    []byte{},
 		CreatedAt: now.Add(time.Minute),
 	}
@@ -133,6 +137,9 @@ func TestSQLite_PasskeyLifecycle(t *testing.T) {
 	if len(got.AAGUID) != 3 {
 		t.Errorf("pk1 AAGUID = %x, want 3 bytes", got.AAGUID)
 	}
+	if !got.BackupEligible || !got.BackupState {
+		t.Errorf("pk1 backup flags lost on round-trip: BE=%v BS=%v", got.BackupEligible, got.BackupState)
+	}
 
 	gotEmpty, err := s.GetPasskey([]byte{0xCA, 0xFE})
 	if err != nil {
@@ -147,6 +154,9 @@ func TestSQLite_PasskeyLifecycle(t *testing.T) {
 	if gotEmpty.AAGUID != nil {
 		// Empty AAGUID written via nullBytes should come back as nil, NOT an empty slice.
 		t.Errorf("pk2 AAGUID should be nil after nullBytes round-trip, got %v (len=%d)", gotEmpty.AAGUID, len(gotEmpty.AAGUID))
+	}
+	if gotEmpty.BackupEligible || gotEmpty.BackupState {
+		t.Errorf("pk2 backup flags should default to false, got BE=%v BS=%v", gotEmpty.BackupEligible, gotEmpty.BackupState)
 	}
 
 	list, err := s.ListPasskeys("user-1")
