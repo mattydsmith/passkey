@@ -28,16 +28,24 @@ type EmailOTP struct {
 }
 
 // Passkey represents a registered WebAuthn credential.
+//
+// BackupEligible and BackupState mirror the WebAuthn authenticator-data flags
+// (BE and BS). go-webauthn validates the asserted BE flag against the stored
+// value on every login (webauthn/login.go:371) — if they differ, the login
+// fails with "Backup Eligible flag inconsistency detected during login
+// validation". Both must be captured at registration and replayed on load.
 type Passkey struct {
-	CredentialID []byte
-	UserID       string
-	PublicKey    []byte
-	SignCount    uint32
-	Transports   *string // JSON-encoded []string, matches TS wire format (e.g. `["usb","nfc"]`)
-	AAGUID       []byte
-	DeviceName   *string
-	CreatedAt    time.Time
-	LastUsedAt   *time.Time
+	CredentialID    []byte
+	UserID          string
+	PublicKey       []byte
+	SignCount       uint32
+	Transports      *string // JSON-encoded []string, matches TS wire format (e.g. `["usb","nfc"]`)
+	AAGUID          []byte
+	DeviceName      *string
+	BackupEligible  bool
+	BackupState     bool
+	CreatedAt       time.Time
+	LastUsedAt      *time.Time
 }
 
 // Storage is the persistence interface. All methods MUST be safe for
