@@ -2,7 +2,6 @@ package auth
 
 import (
 	"crypto/rand"
-	"errors"
 	"math/big"
 	"time"
 
@@ -16,13 +15,13 @@ const OTPMaxAttempts = 5
 const OTPCodeLength = 6
 
 // ErrInvalidOTP is returned when the code does not match.
-var ErrInvalidOTP = errors.New("invalid_otp")
+var ErrInvalidOTP = storage.ErrInvalidOTP
 
 // ErrOTPExpired is returned when the OTP is past its expiry.
-var ErrOTPExpired = errors.New("otp_expired")
+var ErrOTPExpired = storage.ErrOTPExpired
 
 // ErrOTPAttemptsExceeded is returned after OTPMaxAttempts wrong codes.
-var ErrOTPAttemptsExceeded = errors.New("otp_attempts_exceeded")
+var ErrOTPAttemptsExceeded = storage.ErrOTPAttemptsExceeded
 
 // StartEmailOTP creates a fresh OTP row and asks emailer to deliver the code.
 // Returns the OTP ID and time-to-live in seconds.
@@ -55,28 +54,14 @@ func StartEmailOTP(s storage.Storage, emailer EmailSender, email string, ttl tim
 // is hit (checked at the start of each call, matching the TS impl semantics:
 // N wrong codes → N×401, then the (N+1)th call → 429).
 func VerifyEmailOTP(s storage.Storage, otpID, code string, now time.Time) (email string, err error) {
-	o, err := s.GetOTP(otpID)
-	if err != nil {
-		return "", ErrInvalidOTP
-	}
-	if o.ConsumedAt != nil {
-		return "", ErrInvalidOTP
-	}
-	// Check the attempt count BEFORE the hash — mirrors TS verifyEmailOtp.
-	if o.Attempts >= OTPMaxAttempts {
-		return "", ErrOTPAttemptsExceeded
-	}
-	if now.After(o.ExpiresAt) {
-		return "", ErrOTPExpired
-	}
-	if string(HashToken(code)) != string(o.CodeHash) {
-		_, _ = s.IncrementOTPAttempts(otpID)
-		return "", ErrInvalidOTP
-	}
-	if err := s.ConsumeOTP(otpID, now); err != nil {
-		return "", err
-	}
-	return o.Email, nil
+	return VerifyEmailOTPWithClock(s, otpID, code, func() time.Time { return now })
+}
+
+// VerifyEmailOTPWithClock samples the clock after acquiring the storage write
+// lock, so a code that expires while waiting cannot be redeemed. HTTP callers
+// should use this form; VerifyEmailOTP remains a fixed-instant convenience.
+func VerifyEmailOTPWithClock(s storage.Storage, otpID, code string, now func() time.Time) (string, error) {
+	return s.VerifyOTP(otpID, HashToken(code), OTPMaxAttempts, now)
 }
 
 func genCode(n int) (string, error) {
