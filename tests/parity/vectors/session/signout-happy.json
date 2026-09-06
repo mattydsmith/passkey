@@ -6,32 +6,73 @@
       "request": {
         "method": "POST",
         "path": "/auth/email/start",
-        "body": { "email": "parity-signout-happy@example.com" }
+        "body": {
+          "email": "parity-signout-happy@example.com"
+        }
       },
-      "expect": { "status": 200 },
-      "capture": { "otpId": "$.body.otpId" }
+      "expect": {
+        "status": 200
+      },
+      "capture": {
+        "otpId": "$.body.otpId"
+      }
     },
     {
       "request": {
         "method": "GET",
         "path": "/__test/last-otp?email=parity-signout-happy@example.com"
       },
-      "expect": { "status": 200 },
-      "capture": { "code": "$.body.code" }
+      "expect": {
+        "status": 200
+      },
+      "capture": {
+        "code": "$.body.code"
+      }
     },
     {
       "request": {
         "method": "POST",
         "path": "/auth/email/verify",
-        "body": { "otpId": "{{otpId}}", "code": "{{code}}" }
+        "body": {
+          "otpId": "{{otpId}}",
+          "code": "{{code}}"
+        }
       },
-      "expect": { "status": 200 }
+      "expect": {
+        "status": 200
+      },
+      "capture": {
+        "revokedToken": "$.body.sessionToken"
+      }
     },
     {
-      "request": { "method": "POST", "path": "/auth/sign-out", "body": {} },
+      "request": {
+        "method": "POST",
+        "path": "/auth/sign-out",
+        "body": {}
+      },
       "expect": {
         "status": 200,
-        "body": { "ok": { "const": true } }
+        "body": {
+          "ok": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/auth/me",
+        "headers": {
+          "Authorization": "Bearer {{revokedToken}}"
+        }
+      },
+      "expect": {
+        "status": 401,
+        "body": {
+          "error": "unauthenticated"
+        }
       }
     }
   ]
