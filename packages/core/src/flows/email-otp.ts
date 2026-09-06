@@ -60,31 +60,33 @@ export async function verifyEmailOtp(args: {
   maxAttempts: number;
 }): Promise<User> {
   const { db, deps, findOrCreateByEmail, otpId, code, maxAttempts } = args;
-  const row = getOtpById(db, otpId);
-  if (!row) {
-    throw new AuthError("invalid_otp", "OTP not found");
-  }
-  if (row.consumedAt !== null) {
-    throw new AuthError("invalid_otp", "OTP already consumed");
-  }
-  if (row.attempts >= maxAttempts) {
-    throw new AuthError("otp_attempts_exceeded", "Too many attempts");
-  }
-  if (row.expiresAt <= deps.now()) {
-    throw new AuthError("otp_expired", "OTP has expired");
-  }
-
-  const provided = hashCode(code);
-  const matches =
-    provided.length === row.codeHash.length &&
-    timingSafeEqual(provided, row.codeHash);
-
-  if (!matches) {
-    incrementOtpAttempts(db, otpId);
-    throw new AuthError("invalid_otp", "Code does not match");
-  }
-
-  markOtpConsumed(db, otpId, deps.now());
-  const userId = await findOrCreateByEmail(row.email);
-  return { id: userId, email: row.email };
+  // better-sqlite3 calls are synchronous, but other processes can share the
+  // file. Acquire the write lock before reading and keep check/update together.
+  const result = db.transaction((): { email: string } | { error: AuthError } => {
+    const row = getOtpById(db, otpId);
+    if (!row || row.consumedAt !== null) {
+      return { error: new AuthError("invalid_otp", "OTP missing or consumed") };
+    }
+    if (row.attempts >= maxAttempts) {
+      return { error: new AuthError("otp_attempts_exceeded", "Too many attempts") };
+    }
+    const now = deps.now();
+    if (row.expiresAt <= now) {
+      return { error: new AuthError("otp_expired", "OTP has expired") };
+    }
+    const provided = hashCode(code);
+    const matches = provided.length === row.codeHash.length &&
+      timingSafeEqual(provided, row.codeHash);
+    if (!matches) {
+      incrementOtpAttempts(db, otpId);
+      // Return, then throw after commit: throwing here rolls back the guess.
+      return { error: new AuthError("invalid_otp", "Code does not match") };
+    }
+    markOtpConsumed(db, otpId, now);
+    return { email: row.email };
+  }).immediate();
+  if ("error" in result) throw result.error;
+  const email = result.email;
+  const userId = await findOrCreateByEmail(email);
+  return { id: userId, email };
 }

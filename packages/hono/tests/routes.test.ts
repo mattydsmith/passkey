@@ -370,3 +370,28 @@ describe("mountAuthRoutes — CSRF", () => {
     expect(out.status).toBe(200);
   });
 });
+
+
+describe("session revocation failure", () => {
+  it("keeps cookies and reports a failed database deletion", async () => {
+    const { app, sentOtps, db } = buildApp();
+    const start = await app.request("/auth/email/start", { method: "POST",
+      headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "revoke@example.com" }) });
+    const { otpId } = await start.json();
+    const verify = await app.request("/auth/email/verify", { method: "POST",
+      headers: { "content-type": "application/json" }, body: JSON.stringify({ otpId, code: sentOtps[0]!.code }) });
+    const { sessionToken } = await verify.json();
+    const headers = { authorization: `Bearer ${sessionToken}` };
+    db.exec(`CREATE TRIGGER fail_delete BEFORE DELETE ON auth_sessions
+      BEGIN SELECT RAISE(ABORT, 'injected delete failure'); END`);
+    const failed = await app.request("/auth/sign-out", { method: "POST", headers });
+    expect(failed.status).toBe(500);
+    expect(await failed.json()).toMatchObject({ error: "internal_error" });
+    expect(failed.headers.get("set-cookie")).toBeNull();
+    expect((await app.request("/auth/me", { headers })).status).toBe(200);
+    db.exec("DROP TRIGGER fail_delete");
+    expect((await app.request("/auth/sign-out", { method: "POST", headers })).status).toBe(200);
+    expect((await app.request("/auth/me", { headers })).status).toBe(401);
+    db.close();
+  });
+});
