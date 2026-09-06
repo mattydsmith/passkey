@@ -69,3 +69,20 @@ func TestRequireSession_Expired(t *testing.T) {
 		t.Errorf("want ErrUnauthenticated, got %v", err)
 	}
 }
+
+func TestSessionMalformedHeaderDoesNotFallBackToCookie(t *testing.T) {
+	s := newStore(t)
+	now := time.Now()
+	token, err := CreateSession(s, "user", time.Hour, now, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, header := range []string{"Basic bad", "Bearer ", "Bearer wrong"} {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.AddCookie(&http.Cookie{Name: "session", Value: token})
+		req.Header.Set("Authorization", header)
+		if _, err := RequireSession(s, req, "session", now); err != ErrUnauthenticated {
+			t.Errorf("%q fell through to cookie: %v", header, err)
+		}
+	}
+}

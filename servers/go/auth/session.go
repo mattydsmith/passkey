@@ -55,12 +55,13 @@ func RequireSession(s storage.Storage, r *http.Request, cookieName string, now t
 }
 
 // SignOut deletes the session row matching the request's token (if any). Idempotent.
-func SignOut(s storage.Storage, r *http.Request, cookieName string) {
+// Callers must propagate deletion errors and retain credentials for retry.
+func SignOut(s storage.Storage, r *http.Request, cookieName string) error {
 	token := extractToken(r, cookieName)
 	if token == "" {
-		return
+		return nil
 	}
-	_ = s.DeleteSession(HashToken(token))
+	return s.DeleteSession(HashToken(token))
 }
 
 func extractToken(r *http.Request, cookieName string) string {
@@ -68,6 +69,7 @@ func extractToken(r *http.Request, cookieName string) string {
 		if strings.HasPrefix(strings.ToLower(h), "bearer ") {
 			return strings.TrimSpace(h[7:])
 		}
+		return "" // A present header takes precedence, even when malformed.
 	}
 	if cookieName != "" {
 		if c, err := r.Cookie(cookieName); err == nil {

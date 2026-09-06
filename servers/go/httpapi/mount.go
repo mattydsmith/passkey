@@ -89,7 +89,9 @@ func Mount(r chi.Router, cfg Config) error {
 }
 
 func handleEmailStart(cfg Config) http.HandlerFunc {
-	type req struct{ Email string `json:"email"` }
+	type req struct {
+		Email string `json:"email"`
+	}
 	type resp struct {
 		OTPID            string `json:"otpId"`
 		ExpiresInSeconds int    `json:"expiresInSeconds"`
@@ -137,7 +139,7 @@ func handleEmailVerify(cfg Config) http.HandlerFunc {
 			writeJSON(w, 400, errBody{"invalid_request", "code must be six digits"})
 			return
 		}
-		email, err := auth.VerifyEmailOTP(cfg.Storage, body.OTPID, body.Code, cfg.Now())
+		email, err := auth.VerifyEmailOTPWithClock(cfg.Storage, body.OTPID, body.Code, cfg.Now)
 		if err != nil {
 			writeError(w, err)
 			return
@@ -192,7 +194,10 @@ func handleMe(cfg Config) http.HandlerFunc {
 
 func handleSignOut(cfg Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		auth.SignOut(cfg.Storage, r, cfg.SessionCookieName)
+		if err := auth.SignOut(cfg.Storage, r, cfg.SessionCookieName); err != nil {
+			writeError(w, err)
+			return
+		}
 		if cfg.SessionCookieName != "" {
 			clearSessionCookie(w, cfg.SessionCookieName)
 			clearCSRFCookie(w, cfg.CSRFCookieName)

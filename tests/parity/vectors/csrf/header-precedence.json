@@ -1,13 +1,13 @@
 {
-  "name": "email/verify-happy",
-  "mode": "bearer",
+  "name": "csrf/header-precedence",
+  "mode": "cookie",
   "steps": [
     {
       "request": {
         "method": "POST",
         "path": "/auth/email/start",
         "body": {
-          "email": "parity-verify@example.com"
+          "email": "parity-header-precedence@example.com"
         }
       },
       "expect": {
@@ -30,16 +30,10 @@
     {
       "request": {
         "method": "GET",
-        "path": "/__test/last-otp?email=parity-verify@example.com"
+        "path": "/__test/last-otp?email=parity-header-precedence@example.com"
       },
       "expect": {
-        "status": 200,
-        "body": {
-          "code": {
-            "type": "string",
-            "nonEmpty": true
-          }
-        }
+        "status": 200
       },
       "capture": {
         "code": "$.body.code"
@@ -67,7 +61,7 @@
               "nonEmpty": true
             },
             "email": {
-              "const": "parity-verify@example.com"
+              "const": "parity-header-precedence@example.com"
             }
           }
         }
@@ -75,18 +69,61 @@
     },
     {
       "request": {
-        "method": "POST",
-        "path": "/auth/email/verify",
+        "method": "GET",
+        "path": "/auth/me"
+      },
+      "expect": {
+        "status": 200,
         "body": {
-          "otpId": "{{otpId}}",
-          "code": "{{code}}"
+          "user": {
+            "id": {
+              "type": "string",
+              "nonEmpty": true
+            },
+            "email": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/auth/me",
+        "headers": {
+          "Authorization": "Basic malformed"
         }
       },
       "expect": {
         "status": 401,
         "body": {
-          "error": "invalid_otp"
+          "error": "unauthenticated"
         }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/auth/me",
+        "headers": {
+          "Authorization": "Bearer invalid"
+        }
+      },
+      "expect": {
+        "status": 401,
+        "body": {
+          "error": "unauthenticated"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/auth/me"
+      },
+      "expect": {
+        "status": 200
       }
     }
   ]

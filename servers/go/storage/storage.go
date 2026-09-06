@@ -3,7 +3,10 @@
 // any backing store; only a SQLite impl ships today.
 package storage
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 // Session represents a server-side session row.
 type Session struct {
@@ -35,17 +38,17 @@ type EmailOTP struct {
 // fails with "Backup Eligible flag inconsistency detected during login
 // validation". Both must be captured at registration and replayed on load.
 type Passkey struct {
-	CredentialID    []byte
-	UserID          string
-	PublicKey       []byte
-	SignCount       uint32
-	Transports      *string // JSON-encoded []string, matches TS wire format (e.g. `["usb","nfc"]`)
-	AAGUID          []byte
-	DeviceName      *string
-	BackupEligible  bool
-	BackupState     bool
-	CreatedAt       time.Time
-	LastUsedAt      *time.Time
+	CredentialID   []byte
+	UserID         string
+	PublicKey      []byte
+	SignCount      uint32
+	Transports     *string // JSON-encoded []string, matches TS wire format (e.g. `["usb","nfc"]`)
+	AAGUID         []byte
+	DeviceName     *string
+	BackupEligible bool
+	BackupState    bool
+	CreatedAt      time.Time
+	LastUsedAt     *time.Time
 }
 
 // Storage is the persistence interface. All methods MUST be safe for
@@ -59,6 +62,9 @@ type Storage interface {
 	ListSessions(userID string) ([]Session, error)
 
 	// Email OTPs
+	// VerifyOTP atomically checks expiry/attempts/hash and consumes or counts a
+	// wrong guess. Sample now only after acquiring the database write lock.
+	VerifyOTP(id string, codeHash []byte, maxAttempts int, now func() time.Time) (string, error)
 	CreateOTP(o EmailOTP) error
 	GetOTP(id string) (*EmailOTP, error)
 	IncrementOTPAttempts(id string) (int, error)
@@ -82,3 +88,10 @@ var ErrNotFound = errNotFound{}
 type errNotFound struct{}
 
 func (errNotFound) Error() string { return "storage: not found" }
+
+// OTP verification errors are shared with auth without introducing an import cycle.
+var (
+	ErrInvalidOTP          = errors.New("invalid_otp")
+	ErrOTPExpired          = errors.New("otp_expired")
+	ErrOTPAttemptsExceeded = errors.New("otp_attempts_exceeded")
+)

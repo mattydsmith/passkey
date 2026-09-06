@@ -10,7 +10,9 @@ Authenticated requests carry the session token either as:
 - `Authorization: Bearer <token>` header, or
 - `Cookie: session=<token>` (if a cookie name is configured).
 
-The client picks one mode at construction time.
+The client picks one mode at construction time. A present Authorization header
+takes precedence over a cookie; malformed or invalid headers never fall back
+to the cookie.
 
 ## CSRF (cookie mode only)
 
@@ -51,7 +53,15 @@ Verify the OTP. Creates the user if needed (via project hook). Issues a session.
 
 Request: `{ "otpId": string, "code": string }`
 Response 200: `{ "sessionToken": string, "user": { "id": string, "email": string } }`
-Errors: `invalid_otp` (401), `otp_attempts_exceeded` (429), `otp_expired` (410).
+Errors: `invalid_otp` (401), `otp_attempts_exceeded` (429), `otp_expired` (410),
+`internal_error` (500) when the database operation fails.
+
+Verification checks expiry, the attempt limit and the code, then consumes the
+code or records a wrong guess in one write transaction. Expiry is checked after
+acquiring the write lock; equality with the expiry instant is expired. A code
+can be redeemed once, including across concurrent connections. Five wrong
+guesses return 401; subsequent attempts return 429. A failed write/commit must
+never be reported as successful verification or silently treated as a wrong code.
 
 If a `session` cookie is configured, the response sets it; clients in cookie
 mode rely on the browser to persist it.
@@ -107,6 +117,9 @@ Errors: `unauthenticated` (401).
 Revokes the current session.
 
 Response 200: `{ "ok": true }`. Sets an expired cookie if cookie mode is in use.
+Database deletion failures return `internal_error` (500) and do not clear
+cookies, allowing the client to retry. Success means the session was deleted
+or was already absent. It must no longer authenticate after success.
 
 ### GET /auth/sessions  (authenticated)
 

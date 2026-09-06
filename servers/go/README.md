@@ -37,3 +37,21 @@ make test
 
 Cross-impl conformance is verified via `pnpm test:parity --server=go` from the
 repo root.
+
+## Atomic verification and revocation upgrade
+
+Custom `storage.Storage` implementations must implement `VerifyOTP`: acquire a
+write lock, sample the clock, check expiry/attempts/hash, and consume or record a
+wrong guess in one transaction. Do not implement it using separate public reads
+and writes. The built-in SQLite store waits up to five seconds for a competing
+writer on every connection. Existing tables and sessions need no migration.
+
+`auth.SignOut` now returns an error. Direct callers must check it before reporting
+success or clearing credentials. The bundled HTTP adapter does this. Go permits
+ignoring returned values in a call statement, so existing callers should be
+reviewed explicitly. Prefer `VerifyEmailOTPWithClock` for live requests;
+`VerifyEmailOTP` verifies at the supplied fixed instant for compatibility.
+
+These changes do not provide account eligibility checks, delivery rate limits,
+or atomic user lookup and session issuance. Applications must enforce those
+policies before enabling email sign-in for additional users.

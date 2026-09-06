@@ -55,6 +55,7 @@ export function createAuth(config: AuthConfig, runtime: AuthRuntime) {
     if (auth) {
       const m = auth.match(/^Bearer\s+(.+)$/i);
       if (m) return m[1]!;
+      return null; // A malformed header must not fall through to a cookie.
     }
     const cookieName = opts?.cookieName ?? config.session.cookieName;
     if (cookieName) {

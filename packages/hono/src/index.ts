@@ -175,7 +175,7 @@ export function mountAuthRoutes(app: Hono, auth: Auth, opts: MountOptions = {}) 
         const m = authHeader.match(/^Bearer\s+(.+)$/i);
         if (m) token = m[1]!;
       }
-      if (!token && cookieHeader) {
+      if (!authHeader && cookieHeader) {
         for (const part of cookieHeader.split(";")) {
           const [k, v] = part.trim().split("=", 2);
           if (k === cookieName && v) { token = decodeURIComponent(v); break; }

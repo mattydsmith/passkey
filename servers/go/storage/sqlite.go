@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"context"
+	"crypto/subtle"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -16,9 +18,11 @@ type sqliteStore struct {
 }
 
 // OpenSQLite opens (or creates) a SQLite database at path, applies all
-// pending migrations, and returns a Storage backed by it.
+// pending migrations, and returns a Storage backed by it. Each connection waits
+// up to five seconds for a competing writer. Transactions acquire their write
+// lock before reading, including across independent handles/processes.
 func OpenSQLite(path string) (Storage, error) {
-	db, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)")
+	db, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_txlock=immediate")
 	if err != nil {
 		return nil, err
 	}
@@ -313,11 +317,62 @@ func nullStr(p *string) any {
 }
 
 // nullBytes converts a possibly-empty []byte into a SQL NULL when it has no
-// content. Without this, an empty slice writes an empty BLOB (X''), which
+// content. Without this, an empty slice writes a zero-length BLOB, which
 // is distinct from NULL and won't round-trip as "absent".
 func nullBytes(b []byte) any {
 	if len(b) == 0 {
 		return nil
 	}
 	return b
+}
+
+// VerifyOTP holds a database write lock across validation and mutation. A mutex
+// alone cannot protect callers using another handle or another process.
+func (s *sqliteStore) VerifyOTP(id string, codeHash []byte, maxAttempts int, now func() time.Time) (string, error) {
+	tx, err := s.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+	var email string
+	var storedHash []byte
+	var attempts int
+	var expiresAt int64
+	var consumedAt sql.NullInt64
+	err = tx.QueryRow(`SELECT email, code_hash, attempts, expires_at, consumed_at
+ FROM auth_email_otps WHERE id = ?`, id).Scan(&email, &storedHash, &attempts, &expiresAt, &consumedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrInvalidOTP
+	}
+	if err != nil {
+		return "", err
+	}
+	if consumedAt.Valid {
+		return "", ErrInvalidOTP
+	}
+	if attempts >= maxAttempts {
+		return "", ErrOTPAttemptsExceeded
+	}
+	at := now()
+	if !at.Before(time.Unix(expiresAt, 0)) {
+		return "", ErrOTPExpired
+	}
+	matches := subtle.ConstantTimeCompare(codeHash, storedHash) == 1
+	if matches {
+		_, err = tx.Exec(`UPDATE auth_email_otps SET consumed_at = ? WHERE id = ?`, at.Unix(), id)
+	} else {
+		_, err = tx.Exec(`UPDATE auth_email_otps SET attempts = attempts + 1 WHERE id = ?`, id)
+	}
+	if err != nil {
+		return "", err
+	}
+	// Wrong guesses must commit too. Returning an auth error before commit would
+	// roll back the attempt counter and give an attacker unlimited guesses.
+	if err := tx.Commit(); err != nil {
+		return "", err
+	}
+	if !matches {
+		return "", ErrInvalidOTP
+	}
+	return email, nil
 }

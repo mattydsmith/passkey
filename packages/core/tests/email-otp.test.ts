@@ -137,4 +137,30 @@ describe("verifyEmailOtp", () => {
       })
     ).rejects.toMatchObject({ code: "otp_expired" });
   });
+  it("checks expiry and consumes under one write transaction", async () => {
+    const { otpId, code } = await startAndGet();
+    const sampledInTransaction: boolean[] = [];
+    await verifyEmailOtp({
+      db: h.db, deps: { ...h.deps, now: () => {
+        sampledInTransaction.push(h.db.inTransaction);
+        return h.clock.now;
+      } }, findOrCreateByEmail: h.findOrCreateByEmail,
+      otpId, code, maxAttempts: 5,
+    });
+    expect(sampledInTransaction.length).toBeGreaterThan(0);
+    expect(sampledInTransaction.every(Boolean)).toBe(true);
+  });
+
+  it("leaves the code redeemable when consumption fails", async () => {
+    const { otpId, code } = await startAndGet();
+    h.db.exec(`CREATE TRIGGER fail_update BEFORE UPDATE ON auth_email_otps
+      BEGIN SELECT RAISE(ABORT, 'injected update failure'); END`);
+    const args = { db: h.db, deps: h.deps, findOrCreateByEmail: h.findOrCreateByEmail,
+      otpId, code, maxAttempts: 5 };
+    await expect(verifyEmailOtp(args)).rejects.toThrow("injected update failure");
+    expect(h.users.size).toBe(0);
+    h.db.exec("DROP TRIGGER fail_update");
+    await expect(verifyEmailOtp(args)).resolves.toMatchObject({ email: "matt@example.com" });
+  });
+
 });
