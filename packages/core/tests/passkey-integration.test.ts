@@ -121,6 +121,7 @@ describe("passkey registration (integration)", () => {
 
     // Finish registration
     const result = await auth.finishPasskeyRegistration({
+      userId: "u_1",
       registrationId,
       credential: FAKE_REGISTRATION_CREDENTIAL as any,
       deviceName: "Test Device",
@@ -136,6 +137,30 @@ describe("passkey registration (integration)", () => {
     expect(Buffer.from(stored[0]!.credentialId).toString("base64url")).toBe(CRED_ID_BASE64URL);
   });
 
+  it("refuses a different or absent owner without consuming the challenge", async () => {
+    vi.mocked(simpleWebauthn.verifyRegistrationResponse).mockResolvedValue({
+      verified: true, registrationInfo: {
+        credentialID: CRED_ID_BASE64URL,
+        credentialPublicKey: new Uint8Array([20,21,22]), counter: 0, aaguid: AAGUID_HEX,
+      } as any,
+    } as any);
+    const auth = buildAuth(h);
+    const { registrationId } = await auth.beginPasskeyRegistration({ user: { id: "u_1", email: "owner@example.com" } });
+    for (const userId of ["other", "", undefined]) {
+      for (let i=0; i<10; i++) {
+        await expect(auth.finishPasskeyRegistration({userId, registrationId, credential: FAKE_REGISTRATION_CREDENTIAL} as any))
+          .rejects.toMatchObject({code: "invalid_credential"});
+      }
+    }
+    expect(simpleWebauthn.verifyRegistrationResponse).not.toHaveBeenCalled();
+    expect(auth.listPasskeys({userId: "u_1"})).toHaveLength(0);
+    expect(auth.listPasskeys({userId: "other"})).toHaveLength(0);
+    await expect(auth.finishPasskeyRegistration({userId: "u_1", registrationId, credential: FAKE_REGISTRATION_CREDENTIAL} as any)).resolves.toEqual({passkeyId: CRED_ID_BASE64URL});
+    expect(simpleWebauthn.verifyRegistrationResponse).toHaveBeenCalledOnce();
+    expect(auth.listPasskeys({userId: "u_1"})).toHaveLength(1);
+    await expect(auth.finishPasskeyRegistration({userId: "u_1", registrationId, credential: FAKE_REGISTRATION_CREDENTIAL} as any)).rejects.toMatchObject({code: "invalid_credential"});
+  });
+
   it("rejects when verifier returns verified: false", async () => {
     vi.mocked(simpleWebauthn.verifyRegistrationResponse).mockResolvedValue({
       verified: false,
@@ -149,6 +174,7 @@ describe("passkey registration (integration)", () => {
 
     await expect(
       auth.finishPasskeyRegistration({
+      userId: "u_1",
         registrationId,
         credential: FAKE_REGISTRATION_CREDENTIAL as any,
       })
@@ -169,6 +195,7 @@ describe("passkey registration (integration)", () => {
 
     await expect(
       auth.finishPasskeyRegistration({
+      userId: "u_1",
         registrationId,
         credential: FAKE_REGISTRATION_CREDENTIAL as any,
       })

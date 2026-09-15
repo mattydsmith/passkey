@@ -38,6 +38,19 @@ func (p *PendingRegistrations) Take(id string) (userID string, s webauthn.Sessio
 	return r.UserID, r.Session, true
 }
 
+// TakeForUser atomically consumes a ceremony only for its authenticated owner.
+// A different signed-in account cannot spend another user's pending challenge.
+func (p *PendingRegistrations) TakeForUser(id, userID string) (webauthn.SessionData, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	r, ok := p.m[id]
+	if !ok || userID == "" || r.UserID != userID {
+		return webauthn.SessionData{}, false
+	}
+	delete(p.m, id)
+	return r.Session, true
+}
+
 // PendingSignIns is the equivalent map for sign-in ceremonies, keyed by signInId.
 type PendingSignIns struct {
 	mu sync.Mutex
