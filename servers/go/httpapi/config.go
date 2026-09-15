@@ -8,12 +8,16 @@ import (
 	"time"
 
 	"github.com/mattydsmith/passkey/servers/go/auth"
+	"github.com/mattydsmith/passkey/servers/go/passkey"
 	"github.com/mattydsmith/passkey/servers/go/storage"
 )
 
 // Config controls how Mount wires routes. All fields except Storage are
 // optional — defaults are applied in Mount.
 type Config struct {
+	// PasskeySignIn owns eligibility, credential recheck, counter update and session
+	// commit after successful WebAuthn verification. Never falls back on error.
+	PasskeySignIn     passkey.SignInIssuer
 	RPID              string
 	RPName            string
 	Origins           []string

@@ -95,8 +95,28 @@ export type EmailStart = (input: {
  request?: Request;
 }) => Promise<{ otpId: string }>;
 
+/** Proof from a successful WebAuthn assertion, before counter persistence. */
+export interface VerifiedPasskeySignIn {
+  userId: string;
+  credentialId: Uint8Array;
+  publicKey: Uint8Array;
+  signCount: number;
+}
+
+/** Recheck host eligibility and this credential, then commit its counter and a
+ * session atomically before returning. Errors never fall back to the SDK issuer.
+ * The challenge has already been consumed. Forwarded IP remains untrusted. */
+export type PasskeySignIn = (input: VerifiedPasskeySignIn & {
+  request?: Request;
+  lifetimeSeconds: number;
+  now: () => number;
+  userAgent: string | null;
+  ip: string | null;
+}) => Promise<SignInResult>;
+
 /** Full SDK config. */
 export interface AuthConfig {
+  passkey?: { signIn: PasskeySignIn };
   rpId: string;
   origins: string[];
   session: {

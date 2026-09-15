@@ -155,6 +155,7 @@ export function mountAuthRoutes(app: Hono, auth: Auth, opts: MountOptions = {}) 
       const siUa = c.req.header("user-agent");
       const siIp = c.req.header("x-forwarded-for");
       const result = await auth.finishPasskeySignIn({
+        request: c.req.raw,
         signInId: parsed.signInId,
         credential: parsed.credential as any,
         ...(siUa !== undefined ? { userAgent: siUa } : {}),

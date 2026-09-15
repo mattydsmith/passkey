@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -46,6 +47,7 @@ func HandleSignInFinish(
 	now func() time.Time,
 	setSessionCookie func(http.ResponseWriter, *http.Request, string, string, int),
 	setCSRFCookie func(http.ResponseWriter, *http.Request, string, string, int),
+	issuers ...SignInIssuer,
 ) http.HandlerFunc {
 	type req struct {
 		SignInID   string          `json:"signInId"`
@@ -103,10 +105,6 @@ func HandleSignInFinish(
 			writeJSONError(w, 401, "invalid_credential", err.Error())
 			return
 		}
-		if updateErr := s.UpdatePasskeySignCount(cred.ID, cred.Authenticator.SignCount, now()); updateErr != nil {
-			slog.Warn("passkey sign-count update failed", "err", updateErr)
-		}
-
 		ua := r.Header.Get("User-Agent")
 		ip := r.Header.Get("X-Forwarded-For")
 		var uap, ipp *string
@@ -116,7 +114,29 @@ func HandleSignInFinish(
 		if ip != "" {
 			ipp = &ip
 		}
-		token, err := auth.CreateSession(s, resolvedUserID, sessionTTL, now(), uap, ipp)
+		var token string
+		if len(issuers) > 0 && issuers[0] != nil {
+			result, issuerErr := issuers[0](r.Context(), SignInInput{UserID: resolvedUserID, CredentialID: cred.ID, PublicKey: cred.PublicKey, SignCount: cred.Authenticator.SignCount, SessionTTL: sessionTTL, Now: now, Request: r, UserAgent: uap, IP: ipp})
+			if errors.Is(issuerErr, ErrSignInDenied) {
+				writeJSONError(w, 401, "invalid_credential", "Sign-in not allowed")
+				return
+			}
+			if errors.Is(issuerErr, auth.ErrSessionUnavailable) {
+				w.Header().Set("Retry-After", "1")
+				writeJSONError(w, 503, "session_unavailable", "Session temporarily unavailable")
+				return
+			}
+			if issuerErr != nil || strings.TrimSpace(result.SessionToken) == "" || result.UserID != resolvedUserID {
+				writeJSONError(w, 500, "internal_error", "Could not complete sign-in")
+				return
+			}
+			token = result.SessionToken
+		} else {
+			if updateErr := s.UpdatePasskeySignCount(cred.ID, cred.Authenticator.SignCount, now()); updateErr != nil {
+				slog.Warn("passkey sign-count update failed", "err", updateErr)
+			}
+			token, err = auth.CreateSession(s, resolvedUserID, sessionTTL, now(), uap, ipp)
+		}
 		if err != nil {
 			writeJSONError(w, 500, "internal_error", err.Error())
 			return
