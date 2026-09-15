@@ -20,6 +20,7 @@ import {
 import {
   beginPasskeySignIn,
   finishPasskeySignIn,
+  verifyPasskeySignIn,
   type BeginSignInResult,
   type FinishSignInInput,
 } from "./flows/passkey-signin.js";
@@ -158,11 +159,27 @@ export function createAuth(config: AuthConfig, runtime: AuthRuntime) {
     },
 
     async finishPasskeySignIn(args: {
+      request?: Request;
       signInId: string;
       credential: FinishSignInInput["credential"];
       userAgent?: string;
       ip?: string;
     }): Promise<SignInResult> {
+      if (config.passkey?.signIn) {
+        const proof = await verifyPasskeySignIn({
+          db, deps, rpId: config.rpId, expectedOrigins: config.origins,
+          signInId: args.signInId, credential: args.credential,
+        });
+        const result = await config.passkey.signIn({
+          ...proof, lifetimeSeconds: config.session.lifetimeSeconds, now: deps.now,
+          userAgent: args.userAgent ?? null, ip: args.ip ?? null,
+          ...(args.request !== undefined ? { request: args.request } : {}),
+        });
+        if (typeof result?.sessionToken !== "string" || !result.sessionToken.trim() || result?.user?.id !== proof.userId) {
+          throw new Error("passkey issuer returned invalid result");
+        }
+        return result;
+      }
       const { userId } = await finishPasskeySignIn({
         db, deps,
         rpId: config.rpId,

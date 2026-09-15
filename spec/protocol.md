@@ -237,3 +237,28 @@ silently accepted. Clients should retain the token and may retry after the
 advertised delay; the SDK does not promise that every storage fault will recover
 on the next request. Host gates must preserve the 503 distinction instead of
 turning every session error into a sign-in redirect or 401.
+
+### Optional host passkey issuer
+
+Go `httpapi.Config.PasskeySignIn` and TypeScript `AuthConfig.passkey.signIn`
+optionally own persistence after a passkey assertion has been cryptographically
+verified. The hook receives the verified user ID, credential ID, public key and
+new counter, plus effective session lifetime, clock and request metadata. The
+host must recheck current account eligibility and the stored credential, then
+commit the counter and session together before returning. The SDK does not
+update the counter or create a default session in this mode. A rejected or
+failed hook never falls back, and never sets cookies. An empty session token or
+a returned user different from the verified identity is an internal error.
+
+Go `passkey.ErrSignInDenied` maps to401 `invalid_credential`;
+`auth.ErrSessionUnavailable` maps to503 `session_unavailable` with Retry-After1.
+TypeScript hosts use the corresponding `AuthError` codes. Other errors yield a
+sanitized500. A challenge is consumed before host issuance; after a failed
+issuance the client must start a new assertion ceremony. No raw assertion is
+passed as an unverified substitute for the verified proof.
+
+The Go request retains socket metadata; Fetch has no inherent trusted peer IP.
+Bodies are already consumed and forwarding headers/IP fields remain untrusted
+until the host establishes proxy trust. Direct TypeScript calls may omit the
+request. With no hook, existing default counter/session behavior is retained;
+the low-level TypeScript `finishPasskeySignIn` also retains its existing shape.

@@ -80,7 +80,7 @@ func Mount(r chi.Router, cfg Config) error {
 				passkey.HandleSignInFinish(
 					cfg.Storage, wa, pendingSign, cfg.SessionTTL,
 					cfg.SessionCookieName, cfg.CSRFCookieName, cfg.Now,
-					setSessionCookie, setCSRFCookie,
+					setSessionCookie, setCSRFCookie, cfg.PasskeySignIn,
 				))
 			r.Get("/passkeys", passkey.HandleListPasskeys(cfg.Storage, cfg.SessionCookieName, cfg.Now))
 			r.Delete("/passkeys/{id}", passkey.HandleDeletePasskey(cfg.Storage, cfg.SessionCookieName, cfg.Now))

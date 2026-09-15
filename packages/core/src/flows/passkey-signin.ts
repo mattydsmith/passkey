@@ -3,6 +3,7 @@ import {
   verifyAuthenticationResponse,
   type VerifyAuthenticationResponseOpts,
 } from "@simplewebauthn/server";
+import type { VerifiedPasskeySignIn } from "../types.js";
 import type { Db } from "../db.js";
 import type { Deps } from "../deps.js";
 import { AuthError } from "../errors.js";
@@ -68,7 +69,9 @@ export interface FinishSignInResult {
   userId: string;
 }
 
-export async function finishPasskeySignIn(input: FinishSignInInput): Promise<FinishSignInResult> {
+// Verification consumes the challenge but deliberately makes no counter/session
+// writes. The host issuer may commit those with its own lifecycle checks.
+export async function verifyPasskeySignIn(input: FinishSignInInput): Promise<VerifiedPasskeySignIn> {
   const { db, deps, signInId, credential, rpId, expectedOrigins } = input;
 
   const pending = pendingSignIns.get(signInId);
@@ -120,12 +123,15 @@ export async function finishPasskeySignIn(input: FinishSignInInput): Promise<Fin
     throw new AuthError("invalid_credential", "Verification did not succeed");
   }
 
-  updatePasskeySignCount(
-    db,
-    stored.credentialId,
-    verification.authenticationInfo.newCounter,
-    deps.now()
-  );
+  return {
+    userId: stored.userId, credentialId: stored.credentialId,
+    publicKey: stored.publicKey, signCount: verification.authenticationInfo.newCounter,
+  };
+}
 
-  return { userId: stored.userId };
+// Preserve the existing low-level entry point and default persistence policy.
+export async function finishPasskeySignIn(input: FinishSignInInput): Promise<FinishSignInResult> {
+  const proof = await verifyPasskeySignIn(input);
+  updatePasskeySignCount(input.db, proof.credentialId, proof.signCount, input.deps.now());
+  return { userId: proof.userId };
 }
