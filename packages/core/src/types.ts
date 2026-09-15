@@ -68,6 +68,8 @@ export interface AasaInput {
  * insertion before returning. Rejections must retain wrong-attempt accounting.
  * An error never falls back to the SDK's default issuer. */
 export type EmailSignIn = (input: {
+  /** Metadata only; body already consumed. Fetch has no trusted peer IP. */
+  request?: Request;
   otpId: string;
   code: string;
   lifetimeSeconds: number;
@@ -85,6 +87,8 @@ export type EmailSignIn = (input: {
  * Enumeration-sensitive refusals should return an opaque ID of the same shape.
  */
 export type EmailStart = (input: {
+ /** Exact original input before trim/case folding; use for character policy. */
+ originalEmail: string;
  email: string;
  expirySeconds: number;
  now: () => number;

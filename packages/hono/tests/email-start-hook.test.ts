@@ -14,6 +14,7 @@ describe("host email start on the mounted route", () => {
         const start: EmailStart = async (input) => {
           calls++;
           expect(input.email).toBe("user@example.com");
+expect(input.originalEmail).toBe(" USER@EXAMPLE.COM ");
           expect(input.expirySeconds).toBe(900);
           expect(input.now()).toBe(1700000000);
           expect(input.request?.headers.get("x-forwarded-for")).toBe("untrusted");

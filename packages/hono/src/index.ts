@@ -4,7 +4,8 @@ import { z } from "zod";
 import { AuthError, type Auth } from "@mattsmith/passkey-sdk-core";
 import { csrfMiddleware } from "./csrf.js";
 
-const startEmailSchema = z.object({ email: z.string().trim().email() });
+// Validate the trimmed form while preserving original characters for host policy.
+const startEmailSchema = z.object({ email: z.string().refine(value => z.string().email().safeParse(value.trim()).success) });
 const verifyEmailSchema = z.object({
   otpId: z.string().min(1),
   code: z.string().regex(/^\d{6}$/),
@@ -108,6 +109,7 @@ export function mountAuthRoutes(app: Hono, auth: Auth, opts: MountOptions = {}) 
       const ua = c.req.header("user-agent");
       const ip = c.req.header("x-forwarded-for");
       const result = await auth.verifyEmailOtp({
+        request: c.req.raw,
         otpId: parsed.otpId,
         code: parsed.code,
         ...(ua !== undefined ? { userAgent: ua } : {}),

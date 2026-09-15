@@ -50,7 +50,10 @@ Errors: `rate_limited` (reserved).
 Hosts that need eligibility, delivery reservation and shared abuse budgets before
 sending can configure Go `Config.EmailStart` or TypeScript `email.start`. The
 hook replaces the whole default start flow after HTTP email validation, and
-receives the normalized address, configured OTP lifetime and a clock function.
+receives the normalized address, the original address before trim/case folding
+(`OriginalEmail` in Go, `originalEmail` in TypeScript), configured OTP lifetime
+and a clock function. Character policies must inspect the original: Unicode
+case folding can turn non-ASCII input (for example Kelvin sign) into ASCII.
 The default sender/storage is never a fallback. Return a nonempty opaque OTP ID
 only after a durable policy decision; the SDK retains the existing response
 shape and configured `expiresInSeconds`. Empty results and hook errors fail
@@ -103,6 +106,14 @@ session insertion before returning the existing success envelope. It receives
 the effective session lifetime, maximum attempts, request metadata and a clock
 function (Go time.Time; TypeScript Unix seconds). Sample the clock after waiting
 for a database write lock. The hook itself does not provide a transaction.
+
+The verification hook also receives metadata-only `Request`/`request` after
+body decoding. Go preserves the transport peer in `RemoteAddr`; Fetch has no
+trusted socket peer, so TypeScript hosts must use their runtime integration.
+Direct TypeScript core calls may omit the request; it is never fabricated.
+The legacy `IP`/`ip` field remains compatible and may come from an untrusted
+forwarding header. Establish explicit proxy trust using transport identity
+before treating it as a verified client address. No proxy is implicitly trusted.
 
 Go hosts sharing the SDK's SQLite database can compose
 `storage.VerifySQLiteOTPInTx` and `storage.CreateSQLiteSessionInTx` with their
