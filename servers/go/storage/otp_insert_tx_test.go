@@ -24,6 +24,16 @@ func TestCreateSQLiteOTPInHostTransaction(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			for _, guard := range []struct{ id, email string }{{"other-address", "other@example.com"}, {"consumed", "user@example.com"}} {
+				if err := st.CreateOTP(EmailOTP{ID: guard.id, Email: guard.email, CodeHash: []byte{8}, CreatedAt: time.Unix(1699999900, 0), ExpiresAt: time.Unix(1700000060, 0)}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			consumedAt := time.Unix(1699999950, 0)
+			if err := st.ConsumeOTP("consumed", consumedAt); err != nil {
+				t.Fatal(err)
+			}
+
 			tx, err := db.Begin()
 			if err != nil {
 				t.Fatal(err)
@@ -63,6 +73,15 @@ func TestCreateSQLiteOTPInHostTransaction(t *testing.T) {
 			}
 			if (old.ConsumedAt != nil) != (mode == "commit") {
 				t.Fatal("old OTP invalidation did not share transaction")
+			}
+
+			other, err := st.GetOTP("other-address")
+			if err != nil || other.ConsumedAt != nil {
+				t.Fatal("another address changed")
+			}
+			consumed, err := st.GetOTP("consumed")
+			if err != nil || consumed.ConsumedAt == nil || !consumed.ConsumedAt.Equal(consumedAt) {
+				t.Fatal("previous consumption timestamp changed")
 			}
 
 			got, err := st.GetOTP("host-otp")

@@ -10,6 +10,11 @@ describe("host OTP transaction", () => {
         runMigrations(db);
         db.exec("CREATE TABLE parent(id INTEGER PRIMARY KEY); CREATE TABLE marker(id INTEGER REFERENCES parent(id) DEFERRABLE INITIALLY DEFERRED)");
         db.transaction(() => createOtpInTransaction(db, { id: "older", email: "user@example.com", codeHash: new Uint8Array([9]), attempts: 0, createdAt: 1699999900, expiresAt: 1700000060 })).immediate();
+        db.transaction(() => {
+          createOtpInTransaction(db, { id: "other-address", email: "other@example.com", codeHash: new Uint8Array([8]), attempts: 0, createdAt: 1699999900, expiresAt: 1700000060 });
+          createOtpInTransaction(db, { id: "consumed", email: "user@example.com", codeHash: new Uint8Array([8]), attempts: 0, createdAt: 1699999900, expiresAt: 1700000060 });
+          db.prepare("UPDATE auth_email_otps SET consumed_at=1699999950 WHERE id='consumed'").run();
+        }).immediate();
         const operation = db.transaction(() => {
           expect(invalidateOtpsInTransaction(db, "user@example.com", 1700000000)).toBe(1);
           createOtpInTransaction(db, { id: "host-otp", email: "user@example.com", codeHash: new Uint8Array([1,2,3]), attempts: 0, createdAt: 1700000000, expiresAt: 1700000060 });
@@ -19,8 +24,10 @@ describe("host OTP transaction", () => {
         });
         if (mode === "commit") operation.immediate(); else expect(() => operation.immediate()).toThrow();
         const expected = { n: mode === "commit" ? 1 : 0 };
-        expect(db.prepare("SELECT count(*) AS n FROM auth_email_otps").get()).toEqual({ n: mode === "commit" ? 2 : 1 });
+        expect(db.prepare("SELECT count(*) AS n FROM auth_email_otps").get()).toEqual({ n: mode === "commit" ? 4 : 3 });
         expect(db.prepare("SELECT consumed_at AS consumed FROM auth_email_otps WHERE id='older'").get()).toEqual({ consumed: mode === "commit" ? 1700000000 : null });
+        expect(db.prepare("SELECT consumed_at AS consumed FROM auth_email_otps WHERE id='other-address'").get()).toEqual({ consumed: null });
+        expect(db.prepare("SELECT consumed_at AS consumed FROM auth_email_otps WHERE id='consumed'").get()).toEqual({ consumed: 1699999950 });
         expect(db.prepare("SELECT count(*) AS n FROM marker").get()).toEqual(expected);
       } finally { db.close(); }
     });

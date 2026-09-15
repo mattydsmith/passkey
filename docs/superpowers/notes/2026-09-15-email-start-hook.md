@@ -29,3 +29,9 @@ cross-implementation parity. The host's full A02 limits, normalization policy,
 enumeration timings, trusted proxy admission, mail delivery and concurrency
 workloads are separate Slate work (#2717), not proven by these SDK hooks.
 No npm publication or deployment is part of this change.
+
+Review strengthened the invalidation fixtures with an unrelated address's live
+OTP and an already-consumed same-address OTP carrying a distinct timestamp.
+Both must remain unchanged in commit and rollback cases. Focused Go race and
+TypeScript tests/typecheck passed; these are preservation guards, not additional
+claimed pre-fix red evidence.
