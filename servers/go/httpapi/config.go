@@ -4,6 +4,7 @@ package httpapi
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/mattydsmith/passkey/servers/go/auth"
@@ -29,6 +30,13 @@ type Config struct {
 	// Mount uses a no-op that returns the email itself as the userID (fine
 	// for demo/parity, NOT recommended for production).
 	GetOrCreateUserID func(email string) (string, error)
+
+	// EmailStart optionally owns the complete email-start policy, reservation,
+	// delivery and activation flow. No default storage or sender runs when set.
+	// The host must return only after its decision is durable. For refused
+	// addresses, return an opaque ID with the same public shape when required
+	// by the host's enumeration policy. Errors never fall back to default start.
+	EmailStart func(context.Context, EmailStartInput) (EmailStartResult, error)
 
 	// EmailSignIn optionally replaces the complete OTP verification, identity
 	// resolution and session insertion sequence. It must return only after its
@@ -57,3 +65,17 @@ type EmailSignInUser struct {
 	ID    string `json:"id"`
 	Email string `json:"email"`
 }
+
+// EmailStartInput carries normalized validated email and effective policy.
+// Request is for metadata only (body already decoded). Forwarded headers are
+// untrusted: the host must establish its own transport/proxy trust boundary.
+// Sample Now only after acquiring any database writer used by host policy.
+type EmailStartInput struct {
+	Email   string
+	OTPTTL  time.Duration
+	Now     func() time.Time
+	Request *http.Request
+}
+
+// EmailStartResult leaves the public lifetime fixed to the configured policy.
+type EmailStartResult struct{ OTPID string }

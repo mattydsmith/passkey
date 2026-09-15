@@ -108,6 +108,20 @@ func handleEmailStart(cfg Config) http.HandlerFunc {
 			writeJSON(w, 400, errBody{"invalid_request", "email looks malformed"})
 			return
 		}
+		if cfg.EmailStart != nil {
+			result, err := cfg.EmailStart(r.Context(), EmailStartInput{Email: email, OTPTTL: cfg.OTPTTL, Now: cfg.Now, Request: r})
+			if err != nil {
+				writeError(w, err)
+				return
+			}
+			if strings.TrimSpace(result.OTPID) == "" {
+				writeError(w, errors.New("email start hook returned empty OTP ID"))
+				return
+			}
+			writeJSON(w, 200, resp{OTPID: result.OTPID, ExpiresInSeconds: int(cfg.OTPTTL / time.Second)})
+			return
+		}
+
 		id, ttl, err := auth.StartEmailOTP(cfg.Storage, cfg.EmailSender, email, cfg.OTPTTL, cfg.Now())
 		if err != nil {
 			writeError(w, err)

@@ -77,6 +77,20 @@ export type EmailSignIn = (input: {
   ip: string | null;
 }) => Promise<SignInResult>;
 
+/** Host-owned complete email start policy/reservation/delivery/activation.
+ * Metadata-only request has an already-consumed body and no trusted peer IP
+ * inherent in Fetch. The host must obtain transport identity from its runtime;
+ * never trust forwarded headers by default. Direct core calls may omit request.
+ * Return only after a durable decision; errors never invoke the default sender.
+ * Enumeration-sensitive refusals should return an opaque ID of the same shape.
+ */
+export type EmailStart = (input: {
+ email: string;
+ expirySeconds: number;
+ now: () => number;
+ request?: Request;
+}) => Promise<{ otpId: string }>;
+
 /** Full SDK config. */
 export interface AuthConfig {
   rpId: string;
@@ -92,6 +106,6 @@ export interface AuthConfig {
   webauthn?: {
     userVerification?: "required" | "preferred" | "discouraged";
   };
-  email: { sendOtp: SendOtp; signIn?: EmailSignIn };
+  email: { sendOtp: SendOtp; signIn?: EmailSignIn; start?: EmailStart };
   users: { findOrCreateByEmail: FindOrCreateByEmail };
 }

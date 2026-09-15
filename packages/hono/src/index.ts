@@ -4,7 +4,7 @@ import { z } from "zod";
 import { AuthError, type Auth } from "@mattsmith/passkey-sdk-core";
 import { csrfMiddleware } from "./csrf.js";
 
-const startEmailSchema = z.object({ email: z.string().email() });
+const startEmailSchema = z.object({ email: z.string().trim().email() });
 const verifyEmailSchema = z.object({
   otpId: z.string().min(1),
   code: z.string().regex(/^\d{6}$/),
@@ -97,7 +97,7 @@ export function mountAuthRoutes(app: Hono, auth: Auth, opts: MountOptions = {}) 
   app.post(`${prefix}/email/start`, async (c) => {
     try {
       const parsed = startEmailSchema.parse(await c.req.json());
-      const result = await auth.startEmailOtp({ email: parsed.email });
+      const result = await auth.startEmailOtp({ email: parsed.email, request: c.req.raw });
       return c.json(result);
     } catch (e) { return errorResponse(c, e); }
   });

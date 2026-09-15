@@ -47,6 +47,36 @@ Request: `{ "email": string }`
 Response 200: `{ "otpId": string, "expiresInSeconds": number }`
 Errors: `rate_limited` (reserved).
 
+Hosts that need eligibility, delivery reservation and shared abuse budgets before
+sending can configure Go `Config.EmailStart` or TypeScript `email.start`. The
+hook replaces the whole default start flow after HTTP email validation, and
+receives the normalized address, configured OTP lifetime and a clock function.
+The default sender/storage is never a fallback. Return a nonempty opaque OTP ID
+only after a durable policy decision; the SDK retains the existing response
+shape and configured `expiresInSeconds`. Empty results and hook errors fail
+closed. For enumeration-sensitive refusals, the host must arrange identical
+public shapes/timing (for example a fresh opaque ID without an activated OTP).
+This hook does not itself supply eligibility, limits, delivery or transactions.
+
+The metadata-only request has already had its body decoded. Go supplies the
+HTTP request including transport `RemoteAddr`; TypeScript HTTP supplies Fetch
+`Request`, which has no trusted transport peer IP. Direct TypeScript core calls
+may omit the request. Hosts must obtain trusted client identity from their
+runtime and explicit proxy policy; forwarded headers are never trusted by this
+hook. A host needing peer identity must not invent one when absent. Both HTTP
+adapters trim the address before validating; the TypeScript adapter now matches
+Go's preexisting whitespace normalization.
+
+Go `storage.InvalidateSQLiteOTPsInTx` / `storage.CreateSQLiteOTPInTx` and TypeScript
+`invalidateOtpsInTransaction` / `createOtpInTransaction` compose older-code
+invalidation and new-code insertion with host writes in an existing SQLite
+transaction. They do not begin, commit or roll back it. Use a writer transaction
+before reading policy/eligibility or sampling time. Invalidation takes an
+already-normalized address and explicit time; insertion creates an unconsumed
+hashed code. Reserve budgets before external mail, and arrange activation only
+after acknowledged delivery if failed mail must never leave a usable code.
+The default start flow remains unchanged and does not acquire these host rules.
+
 ### POST /auth/email/verify
 
 Verify the OTP. Creates the user if needed (via project hook). Issues a session.
