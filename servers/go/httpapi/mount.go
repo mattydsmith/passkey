@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -139,16 +140,6 @@ func handleEmailVerify(cfg Config) http.HandlerFunc {
 			writeJSON(w, 400, errBody{"invalid_request", "code must be six digits"})
 			return
 		}
-		email, err := auth.VerifyEmailOTPWithClock(cfg.Storage, body.OTPID, body.Code, cfg.Now)
-		if err != nil {
-			writeError(w, err)
-			return
-		}
-		userID, err := cfg.GetOrCreateUserID(email)
-		if err != nil {
-			writeError(w, err)
-			return
-		}
 		ua := r.Header.Get("User-Agent")
 		ip := r.Header.Get("X-Forwarded-For")
 		var uap, ipp *string
@@ -158,7 +149,27 @@ func handleEmailVerify(cfg Config) http.HandlerFunc {
 		if ip != "" {
 			ipp = &ip
 		}
-		token, err := auth.CreateSession(cfg.Storage, userID, cfg.SessionTTL, cfg.Now(), uap, ipp)
+		var token, userID, email string
+		var err error
+		if cfg.EmailSignIn != nil {
+			var result EmailSignInResult
+			result, err = cfg.EmailSignIn(r.Context(), EmailSignInInput{
+				OTPID: body.OTPID, Code: body.Code, SessionTTL: cfg.SessionTTL,
+				MaxAttempts: auth.OTPMaxAttempts, Now: cfg.Now, UserAgent: uap, IP: ipp,
+			})
+			token, userID, email = result.SessionToken, result.User.ID, result.User.Email
+			if err == nil && (token == "" || userID == "" || email == "") {
+				err = errors.New("email issuer returned incomplete result")
+			}
+		} else {
+			email, err = auth.VerifyEmailOTPWithClock(cfg.Storage, body.OTPID, body.Code, cfg.Now)
+			if err == nil {
+				userID, err = cfg.GetOrCreateUserID(email)
+			}
+			if err == nil {
+				token, err = auth.CreateSession(cfg.Storage, userID, cfg.SessionTTL, cfg.Now(), uap, ipp)
+			}
+		}
 		if err != nil {
 			writeError(w, err)
 			return

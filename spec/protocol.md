@@ -63,6 +63,26 @@ can be redeemed once, including across concurrent connections. Five wrong
 guesses return 401; subsequent attempts return 429. A failed write/commit must
 never be reported as successful verification or silently treated as a wrong code.
 
+The default flow commits OTP verification before resolving the host user and
+inserting the session. Hosts that need those operations to succeed or roll back
+together can configure Go `Config.EmailSignIn` or TypeScript `email.signIn`.
+This replaces the entire verify/resolve/issue sequence after HTTP input validation;
+errors never fall back to the default flow. The hook must enforce credential
+expiry, attempts and replay protection, check account eligibility, and commit
+session insertion before returning the existing success envelope. It receives
+the effective session lifetime, maximum attempts, request metadata and a clock
+function (Go time.Time; TypeScript Unix seconds). Sample the clock after waiting
+for a database write lock. The hook itself does not provide a transaction.
+
+Go hosts sharing the SDK's SQLite database can compose
+`storage.VerifySQLiteOTPInTx` and `storage.CreateSQLiteSessionInTx` with their
+own eligibility checks in one `*sql.Tx`. Start verification before any reads in
+a deferred transaction so it can acquire the write lock first. A returned
+`OTPVerification.Rejection` must be committed before it is reported (wrong
+attempts are counted); a database error or later session/eligibility failure
+must roll back. Neither helper commits. TypeScript hosts own their corresponding
+transaction; these Go storage helpers do not change the HTTP contract.
+
 If a `session` cookie is configured, the response sets it; clients in cookie
 mode rely on the browser to persist it.
 

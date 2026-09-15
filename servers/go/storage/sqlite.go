@@ -44,7 +44,19 @@ func (s *sqliteStore) Close() error { return s.db.Close() }
 func (s *sqliteStore) CreateSession(sess Session) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, err := s.db.Exec(
+	return insertSQLiteSession(context.Background(), s.db, sess)
+}
+
+// CreateSQLiteSessionInTx inserts a hashed session into the caller's existing
+// SQLite transaction. It does not begin, commit or roll back the transaction.
+func CreateSQLiteSessionInTx(ctx context.Context, tx *sql.Tx, sess Session) error {
+	return insertSQLiteSession(ctx, tx, sess)
+}
+
+func insertSQLiteSession(ctx context.Context, exec interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}, sess Session) error {
+	_, err := exec.ExecContext(ctx,
 		`INSERT INTO auth_sessions (token_hash, user_id, created_at, expires_at, last_seen_at, user_agent, ip)
 		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		sess.TokenHash, sess.UserID,
@@ -334,45 +346,68 @@ func (s *sqliteStore) VerifyOTP(id string, codeHash []byte, maxAttempts int, now
 		return "", err
 	}
 	defer tx.Rollback()
+	result, err := VerifySQLiteOTPInTx(context.Background(), tx, id, codeHash, maxAttempts, now)
+	if err != nil {
+		return "", err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", err
+	}
+	return result.Email, result.Rejection
+}
+
+// OTPVerification separates an authentication rejection from a storage error.
+// A non-nil Rejection may include a recorded wrong guess: commit the transaction
+// before returning it to the client. Any later eligibility or session storage
+// error must roll back the whole transaction, including successful consumption.
+type OTPVerification struct {
+	Email     string
+	Rejection error
+}
+
+// VerifySQLiteOTPInTx verifies and mutates an OTP in the caller's transaction.
+// It acquires SQLite's write lock BEFORE reading and sampling now, even if the
+// transaction uses deferred BEGIN. Call before any reads in a deferred
+// transaction; this cannot upgrade an already stale read snapshot. It never
+// commits or rolls back. See OTPVerification for rejection commit semantics.
+func VerifySQLiteOTPInTx(ctx context.Context, tx *sql.Tx, id string, codeHash []byte, maxAttempts int, now func() time.Time) (OTPVerification, error) {
+	if _, err := tx.ExecContext(ctx, `UPDATE auth_email_otps SET attempts = attempts WHERE id = ?`, id); err != nil {
+		return OTPVerification{}, err
+	}
 	var email string
 	var storedHash []byte
 	var attempts int
 	var expiresAt int64
 	var consumedAt sql.NullInt64
-	err = tx.QueryRow(`SELECT email, code_hash, attempts, expires_at, consumed_at
+	err := tx.QueryRowContext(ctx, `SELECT email, code_hash, attempts, expires_at, consumed_at
  FROM auth_email_otps WHERE id = ?`, id).Scan(&email, &storedHash, &attempts, &expiresAt, &consumedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", ErrInvalidOTP
+		return OTPVerification{Rejection: ErrInvalidOTP}, nil
 	}
 	if err != nil {
-		return "", err
+		return OTPVerification{}, err
 	}
 	if consumedAt.Valid {
-		return "", ErrInvalidOTP
+		return OTPVerification{Rejection: ErrInvalidOTP}, nil
 	}
 	if attempts >= maxAttempts {
-		return "", ErrOTPAttemptsExceeded
+		return OTPVerification{Rejection: ErrOTPAttemptsExceeded}, nil
 	}
 	at := now()
 	if !at.Before(time.Unix(expiresAt, 0)) {
-		return "", ErrOTPExpired
+		return OTPVerification{Rejection: ErrOTPExpired}, nil
 	}
 	matches := subtle.ConstantTimeCompare(codeHash, storedHash) == 1
 	if matches {
-		_, err = tx.Exec(`UPDATE auth_email_otps SET consumed_at = ? WHERE id = ?`, at.Unix(), id)
+		_, err = tx.ExecContext(ctx, `UPDATE auth_email_otps SET consumed_at = ? WHERE id = ?`, at.Unix(), id)
 	} else {
-		_, err = tx.Exec(`UPDATE auth_email_otps SET attempts = attempts + 1 WHERE id = ?`, id)
+		_, err = tx.ExecContext(ctx, `UPDATE auth_email_otps SET attempts = attempts + 1 WHERE id = ?`, id)
 	}
 	if err != nil {
-		return "", err
-	}
-	// Wrong guesses must commit too. Returning an auth error before commit would
-	// roll back the attempt counter and give an attacker unlimited guesses.
-	if err := tx.Commit(); err != nil {
-		return "", err
+		return OTPVerification{}, err
 	}
 	if !matches {
-		return "", ErrInvalidOTP
+		return OTPVerification{Rejection: ErrInvalidOTP}, nil
 	}
-	return email, nil
+	return OTPVerification{Email: email}, nil
 }

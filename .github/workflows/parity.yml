@@ -39,6 +39,16 @@ jobs:
         if: matrix.server == 'go'
         run: go work sync
 
+      - name: Test Go SDK
+        if: matrix.server == 'go'
+        run: go test ./servers/go/...
+
+      - name: Test and typecheck TS packages
+        if: matrix.server == 'ts'
+        run: |
+          pnpm test
+          pnpm typecheck
+
       - name: Install parity runner deps
         run: cd tests/parity/runner && pnpm install --ignore-workspace --frozen-lockfile
 

@@ -87,6 +87,17 @@ export function createAuth(config: AuthConfig, runtime: AuthRuntime) {
       userAgent?: string;
       ip?: string;
     }): Promise<SignInResult> {
+      if (config.email.signIn) {
+        const result = await config.email.signIn({
+          otpId: input.otpId, code: input.code,
+          lifetimeSeconds: config.session.lifetimeSeconds, maxAttempts: otpMaxAttempts,
+          now: deps.now, userAgent: input.userAgent ?? null, ip: input.ip ?? null,
+        });
+        if (!result?.sessionToken || !result.user?.id || !result.user.email) {
+          throw new Error("email issuer returned incomplete result");
+        }
+        return result;
+      }
       const user = await verifyEmailOtp({
         db, deps,
         findOrCreateByEmail: config.users.findOrCreateByEmail,
