@@ -1,0 +1,42 @@
+
+> @mattsmith/passkey-sdk-core@0.0.0 test /Users/mattsmith/.codex/worktrees/slate-passkey-registration-owner/packages/core
+> vitest run "passkey-integration"
+
+
+ RUN  v1.6.1 /Users/mattsmith/.codex/worktrees/slate-passkey-registration-owner/packages/core
+
+ ❯ tests/passkey-integration.test.ts  (6 tests | 1 failed) 68ms
+   ❯ tests/passkey-integration.test.ts > passkey registration (integration) > refuses a different or absent owner without consuming the challenge
+     → promise resolved "{ passkeyId: 'CgsM' }" instead of rejecting
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/passkey-integration.test.ts > passkey registration (integration) > refuses a different or absent owner without consuming the challenge
+AssertionError: promise resolved "{ passkeyId: 'CgsM' }" instead of rejecting
+
+- Expected
++ Received
+
+- [Error: rejected promise]
++ Object {
++   "passkeyId": "CgsM",
++ }
+
+ ❯ tests/passkey-integration.test.ts:151:127
+    149|     for (const userId of ["other", "", undefined]) {
+    150|       for (let i=0; i<10; i++) {
+    151|         await expect(auth.finishPasskeyRegistration({userId, registrat…
+       |                                                                                                                               ^
+    152|           .rejects.toMatchObject({code: "invalid_credential"});
+    153|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+   Start at  23:08:54
+   Duration  327ms (transform 49ms, setup 0ms, collect 121ms, tests 68ms, environment 0ms, prepare 44ms)
+
+/Users/mattsmith/.codex/worktrees/slate-passkey-registration-owner/packages/core:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @mattsmith/passkey-sdk-core@0.0.0 test: `vitest run "passkey-integration"`
+Exit status 1

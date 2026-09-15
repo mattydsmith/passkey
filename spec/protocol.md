@@ -138,7 +138,10 @@ The `options` object is what `navigator.credentials.create()` (web) or
 
 ### POST /auth/passkey/register/finish  (authenticated)
 
-Finish passkey registration.
+Finish passkey registration. The authenticated account must match the account
+that began this ceremony. A different account receives `401 invalid_credential`
+and cannot consume the pending registration; the rightful account may still
+finish it. The caller identity comes from the session, never the request body.
 
 Request: `{ "registrationId": string, "credential": <attestation>, "deviceName"?: string }`
 Response 200: `{ "passkeyId": string }`

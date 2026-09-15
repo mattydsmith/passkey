@@ -188,3 +188,15 @@ Run the reference web demo (talks to `examples/hono-app`):
 - [`docs/superpowers/specs/2026-05-03-passkey-sdk-design.md`](docs/superpowers/specs/2026-05-03-passkey-sdk-design.md) — overall design
 - [`docs/superpowers/notes/2026-05-04-phase-1-completion.md`](docs/superpowers/notes/2026-05-04-phase-1-completion.md) — Phase 1 server handoff
 - [`docs/superpowers/notes/2026-05-04-phase-2-completion.md`](docs/superpowers/notes/2026-05-04-phase-2-completion.md) — Phase 2 web-client handoff
+
+### Registration ownership (September 2026)
+
+The TypeScript core `finishPasskeyRegistration` method now requires `userId`,
+resolved from a verified server-side session. Direct callers must supply this
+field; omission fails closed. The Hono adapter resolves it automatically, so
+the HTTP request body and browser/iOS clients are unchanged. Go mounted routes
+also bind completion to the current authenticated account. A different account
+cannot finish or consume the owner's pending ceremony.
+
+This binds account identity only. It does not provide host account-enabled
+checks or atomically serialize registration persistence with host revocation.

@@ -83,6 +83,8 @@ export async function beginPasskeyRegistration(
 }
 
 export interface FinishRegistrationInput {
+  /** Authenticated caller from the host session, never from the request body. */
+  userId: string;
   db: Db;
   deps: Deps;
   registrationId: string;
@@ -99,10 +101,10 @@ export interface FinishRegistrationResult {
 export async function finishPasskeyRegistration(
   input: FinishRegistrationInput
 ): Promise<FinishRegistrationResult> {
-  const { db, deps, registrationId, credential, rpId, expectedOrigins, deviceName } = input;
+  const { db, deps, userId, registrationId, credential, rpId, expectedOrigins, deviceName } = input;
 
   const pending = pendingRegistrations.get(registrationId);
-  if (!pending) {
+  if (!pending || !userId || pending.userId !== userId) {
     throw new AuthError("invalid_credential", "Registration not found or expired");
   }
   pendingRegistrations.delete(registrationId);

@@ -58,7 +58,8 @@ func HandleRegisterFinish(s storage.Storage, wa *webauthn.WebAuthn, pending *Pen
 		DeviceName     *string         `json:"deviceName,omitempty"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		if _, err := auth.RequireSession(s, r, cookieName, now()); err != nil {
+		userID, err := auth.RequireSession(s, r, cookieName, now())
+		if err != nil {
 			writeSessionError(w, err)
 			return
 		}
@@ -67,9 +68,9 @@ func HandleRegisterFinish(s storage.Storage, wa *webauthn.WebAuthn, pending *Pen
 			writeJSONError(w, 400, "invalid_request", "bad body")
 			return
 		}
-		userID, sess, ok := pending.Take(body.RegistrationID)
+		sess, ok := pending.TakeForUser(body.RegistrationID, userID)
 		if !ok {
-			writeJSONError(w, 400, "invalid_request", "registration not found")
+			writeJSONError(w, 401, "invalid_credential", "Registration not available")
 			return
 		}
 		u, err := loadUser(s, userID)

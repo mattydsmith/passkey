@@ -1,0 +1,8 @@
+--- FAIL: TestRegistrationOwnerHTTP (0.01s)
+    --- FAIL: TestRegistrationOwnerHTTP/bearer (0.00s)
+        registration_owner_test.go:103: cross-account finish=200 {"passkeyId":"c3ludGhldGljLXJlZ2lzdHJhdGlvbg"}
+    --- FAIL: TestRegistrationOwnerHTTP/cookie (0.00s)
+        registration_owner_test.go:103: cross-account finish=200 {"passkeyId":"c3ludGhldGljLXJlZ2lzdHJhdGlvbg"}
+FAIL
+FAIL	github.com/mattydsmith/passkey/servers/go/httpapi	0.212s
+FAIL
