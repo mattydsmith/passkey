@@ -19,7 +19,7 @@ func HandleRegisterStart(s storage.Storage, wa *webauthn.WebAuthn, pending *Pend
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, err := auth.RequireSession(s, r, cookieName, now())
 		if err != nil {
-			writeJSONError(w, 401, "unauthenticated", "Authentication required")
+			writeSessionError(w, err)
 			return
 		}
 		u, err := loadUser(s, userID)
@@ -59,7 +59,7 @@ func HandleRegisterFinish(s storage.Storage, wa *webauthn.WebAuthn, pending *Pen
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		if _, err := auth.RequireSession(s, r, cookieName, now()); err != nil {
-			writeJSONError(w, 401, "unauthenticated", "Authentication required")
+			writeSessionError(w, err)
 			return
 		}
 		var body req

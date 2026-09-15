@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -190,5 +191,16 @@ func TestSQLite_PasskeyLifecycle(t *testing.T) {
 	}
 	if _, err := s.GetPasskey(credID); err == nil {
 		t.Error("expected ErrNotFound after delete")
+	}
+}
+
+func TestSQLiteTouchMissingSessionReturnsNotFound(t *testing.T) {
+	s, err := OpenSQLite(filepath.Join(t.TempDir(), "auth.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if err := s.TouchSession([]byte("missing"), time.Now()); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing session touch: %v", err)
 	}
 }

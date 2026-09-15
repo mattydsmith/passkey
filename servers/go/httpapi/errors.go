@@ -25,6 +25,10 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 
 func writeError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, auth.ErrSessionUnavailable):
+		slog.Error("session unavailable", "err", err)
+		w.Header().Set("Retry-After", "1")
+		writeJSON(w, 503, errBody{"session_unavailable", "Session temporarily unavailable"})
 	case errors.Is(err, auth.ErrUnauthenticated):
 		writeJSON(w, 401, errBody{"unauthenticated", "Authentication required"})
 	case errors.Is(err, auth.ErrInvalidOTP):

@@ -5,6 +5,7 @@ export const AUTH_ERROR_CODES = [
   "invalid_credential",
   "unknown_credential",
   "unauthenticated",
+  "session_unavailable",
   "rate_limited",
 ] as const;
 
@@ -28,5 +29,14 @@ export class AuthError extends Error {
   ): err is AuthError & { code: C } {
     if (!(err instanceof AuthError)) return false;
     return code === undefined || err.code === code;
+  }
+}
+
+/** Session persistence failed; keep credentials for retry. The cause is local
+ * diagnostics only and is deliberately excluded from the wire response. */
+export class SessionUnavailableError extends AuthError {
+  constructor(readonly operation: "lookup" | "touch", cause: unknown) {
+    super("session_unavailable", "Session temporarily unavailable");
+    this.cause = cause;
   }
 }

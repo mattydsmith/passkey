@@ -172,7 +172,27 @@ Errors: `unknown_credential` (404) if the passkey doesn't belong to the caller.
 | `invalid_credential` | 401 | Passkey signature didn't verify |
 | `unknown_credential` | 404 | Credential ID not found / not yours |
 | `unauthenticated` | 401 | No session, or session expired |
+| `session_unavailable` | 503 | Session lookup or last-seen write failed; retain credentials and retry |
 | `csrf_required` | 403 | CSRF token missing or invalid (cookie mode) |
 | `rate_limited` | 429 | Reserved (not enforced by SDK in v1) |
 | `invalid_request` | 400 | Request body failed validation |
 | `internal_error` | 500 | Unexpected server error |
+
+### Session storage failures
+
+Every session-protected endpoint distinguishes an invalid/expired session (401)
+from a failure reading the session or recording its last-seen time (503,
+`session_unavailable`, `Retry-After: 1`). It neither clears cookies nor continues
+the protected operation on that error. Go returns `auth.ErrSessionUnavailable`
+with the operation and original cause wrapped; TypeScript returns
+`SessionUnavailableError` with a local diagnostic cause. Response bodies do not
+include database details. A row removed between lookup and touch is a missing
+session (401), not successful authentication.
+
+This chooses explicit error propagation for host gates. It does not shorten
+SQLite's existing busy timeout or make touches asynchronous: a contended request
+can still wait five seconds, but the failure is reported and logged rather than
+silently accepted. Clients should retain the token and may retry after the
+advertised delay; the SDK does not promise that every storage fault will recover
+on the next request. Host gates must preserve the 503 distinction instead of
+turning every session error into a sign-in redirect or 401.

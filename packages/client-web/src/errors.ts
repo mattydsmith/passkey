@@ -5,6 +5,7 @@ export type AuthClientErrorCode =
   | "invalid_credential"
   | "unknown_credential"
   | "unauthenticated"
+  | "session_unavailable"
   | "rate_limited"
   | "csrf_required"
   | "invalid_request"

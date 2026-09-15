@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { Db } from "./db.js";
 import type { Deps } from "./deps.js";
 import type { SessionRecord } from "./types.js";
-import { AuthError } from "./errors.js";
+import { AuthError, SessionUnavailableError } from "./errors.js";
 import {
   insertSession,
   getSessionByTokenHash,
@@ -72,12 +72,18 @@ export function validateAndBumpSession(args: {
 }): ValidateSessionResult {
   const { db, deps, sessionToken } = args;
   const tokenHash = hashToken(sessionToken);
-  const row = getSessionByTokenHash(db, tokenHash);
+  let row: SessionRecord | undefined;
+  try { row = getSessionByTokenHash(db, tokenHash); }
+  catch (error) { throw new SessionUnavailableError("lookup", error); }
   const now = deps.now();
   if (!row || row.expiresAt <= now) {
     throw new AuthError("unauthenticated", "Session is missing or expired");
   }
-  bumpSessionLastSeen(db, tokenHash, now);
+  try { bumpSessionLastSeen(db, tokenHash, now); }
+  catch (error) {
+    if (AuthError.is(error, "unauthenticated")) throw error;
+    throw new SessionUnavailableError("touch", error);
+  }
   return { userId: row.userId, expiresAt: row.expiresAt };
 }
 
