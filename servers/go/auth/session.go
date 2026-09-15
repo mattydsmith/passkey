@@ -43,29 +43,36 @@ func CreateSession(s storage.Storage, userID string, ttl time.Duration, now time
 // RequireSession resolves the session token from the request (Authorization
 // header or session cookie) and returns the userID. Returns ErrUnauthenticated
 // if the token is missing, invalid, or expired.
-func RequireSession(s storage.Storage, r *http.Request, cookieName string, now time.Time) (userID string, err error) {
+func RequireSession(s storage.Storage, r *http.Request, cookieName string, now time.Time) (string, error) {
+	userID, _, err := RequireSessionWithHash(s, r, cookieName, now)
+	return userID, err
+}
+
+// RequireSessionWithHash returns the verified identity and a copy of its token
+// hash for host transaction checks. It never exposes the plaintext credential.
+func RequireSessionWithHash(s storage.Storage, r *http.Request, cookieName string, now time.Time) (userID string, tokenHash []byte, err error) {
 	token := extractToken(r, cookieName)
 	if token == "" {
-		return "", ErrUnauthenticated
+		return "", nil, ErrUnauthenticated
 	}
 	sess, err := s.GetSession(HashToken(token))
 	if errors.Is(err, storage.ErrNotFound) {
-		return "", ErrUnauthenticated
+		return "", nil, ErrUnauthenticated
 	}
 	if err != nil {
-		return "", fmt.Errorf("%w: lookup: %w", ErrSessionUnavailable, err)
+		return "", nil, fmt.Errorf("%w: lookup: %w", ErrSessionUnavailable, err)
 	}
 	// Treat now == ExpiresAt as expired (matches TS: `expiresAt <= now`).
 	if !now.Before(sess.ExpiresAt) {
-		return "", ErrUnauthenticated
+		return "", nil, ErrUnauthenticated
 	}
 	if err := s.TouchSession(sess.TokenHash, now); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return "", ErrUnauthenticated
+			return "", nil, ErrUnauthenticated
 		}
-		return "", fmt.Errorf("%w: touch: %w", ErrSessionUnavailable, err)
+		return "", nil, fmt.Errorf("%w: touch: %w", ErrSessionUnavailable, err)
 	}
-	return sess.UserID, nil
+	return sess.UserID, append([]byte(nil), sess.TokenHash...), nil
 }
 
 // SignOut deletes the session row matching the request's token (if any). Idempotent.

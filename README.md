@@ -200,3 +200,21 @@ cannot finish or consume the owner's pending ceremony.
 
 This binds account identity only. It does not provide host account-enabled
 checks or atomically serialize registration persistence with host revocation.
+
+### Host-owned registration persistence
+
+Go `httpapi.Config.PasskeyRegistration` and TS `passkey.registrationCommit`
+replace the final credential write after WebAuthn verification. The host must
+check account eligibility and the supplied initiating session hash under the
+same writer/transaction as persistence, sample `Now`/`now` after obtaining that
+writer, and commit before returning success. Failures never fall back to the
+SDK write. The challenge is spent once verification begins, including on host
+failure, so the user must begin a fresh ceremony before retrying.
+
+Host commit mode additionally binds a pending ceremony to its original verified
+session. A different session on the same account cannot resume it. TS direct
+`createAuth` registration calls must supply the original HTTP `request` when
+this option is configured; Hono forwards it automatically. Go
+`storage.CreateSQLitePasskeyInTx` preserves SDK field encoding while letting a
+host own the transaction. This extension does not itself implement a host
+account lifecycle or authorize registration-start data access.

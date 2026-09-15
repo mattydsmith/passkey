@@ -248,12 +248,27 @@ func (s *sqliteStore) ForceExpireOTP(id string) error {
 func (s *sqliteStore) CreatePasskey(p Passkey) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return insertSQLitePasskey(context.Background(), s.db, p)
+}
+
+// CreateSQLitePasskeyInTx inserts within the host transaction without owning
+// commit or rollback; use it after account/session checks under the host writer.
+func CreateSQLitePasskeyInTx(ctx context.Context, tx *sql.Tx, p Passkey) error {
+	if tx == nil {
+		return errors.New("passkey insertion requires transaction")
+	}
+	return insertSQLitePasskey(ctx, tx, p)
+}
+
+func insertSQLitePasskey(ctx context.Context, exec interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}, p Passkey) error {
 	var lastUsed sql.NullInt64
 	if p.LastUsedAt != nil {
 		lastUsed.Int64 = p.LastUsedAt.Unix()
 		lastUsed.Valid = true
 	}
-	_, err := s.db.Exec(
+	_, err := exec.ExecContext(ctx,
 		`INSERT INTO auth_passkeys (credential_id, user_id, public_key, sign_count, transports, aaguid, device_name, backup_eligible, backup_state, created_at, last_used_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		p.CredentialID, p.UserID, p.PublicKey, p.SignCount,

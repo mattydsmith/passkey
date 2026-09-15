@@ -5,6 +5,7 @@ import {
   type VerifyRegistrationResponseOpts,
   type VerifiedRegistrationResponse,
 } from "@simplewebauthn/server";
+import type { PasskeyRegistrationCommit, PasskeyRecord } from "../types.js";
 import type { Db } from "../db.js";
 import type { Deps } from "../deps.js";
 import { listPasskeysByUser, insertPasskey } from "../storage/passkeys.js";
@@ -15,6 +16,7 @@ import { AuthError } from "../errors.js";
  *  credential. We look up the original challenge by that ID to verify.
  *  Stored as {challenge, userId, expiresAt}. */
 interface PendingRegistration {
+  sessionHash?: Uint8Array;
   challenge: string;
   userId: string;
   expiresAt: number;
@@ -29,6 +31,7 @@ function gcExpired(now: number) {
 }
 
 export interface BeginRegistrationInput {
+  sessionHash?: Uint8Array;
   db: Db;
   deps: Deps;
   userId: string;
@@ -74,6 +77,7 @@ export async function beginPasskeyRegistration(
   gcExpired(now);
   const registrationId = deps.randomId("reg");
   pendingRegistrations.set(registrationId, {
+    ...(input.sessionHash ? {sessionHash: new Uint8Array(input.sessionHash)} : {}),
     challenge: options.challenge,
     userId,
     expiresAt: now + REGISTRATION_TTL_SECONDS,
@@ -83,6 +87,9 @@ export async function beginPasskeyRegistration(
 }
 
 export interface FinishRegistrationInput {
+  sessionHash?: Uint8Array;
+  commit?: PasskeyRegistrationCommit;
+  request?: Request;
   /** Authenticated caller from the host session, never from the request body. */
   userId: string;
   db: Db;
@@ -106,6 +113,9 @@ export async function finishPasskeyRegistration(
   const pending = pendingRegistrations.get(registrationId);
   if (!pending || !userId || pending.userId !== userId) {
     throw new AuthError("invalid_credential", "Registration not found or expired");
+  }
+  if (input.commit && (!input.sessionHash?.length || !pending.sessionHash?.length || !Buffer.from(pending.sessionHash).equals(Buffer.from(input.sessionHash)))) {
+    throw new AuthError("invalid_credential", "Registration session changed");
   }
   pendingRegistrations.delete(registrationId);
   if (pending.expiresAt <= deps.now()) {
@@ -135,7 +145,7 @@ export async function finishPasskeyRegistration(
   const publicKey = info.credentialPublicKey; // Uint8Array
   const aaguid = info.aaguid ?? null; // string | null (already a string in v10)
 
-  insertPasskey(db, {
+  const verified: PasskeyRecord = {
     credentialId: Buffer.from(credentialId, "base64url"),
     userId: pending.userId,
     publicKey: new Uint8Array(publicKey),
@@ -145,7 +155,12 @@ export async function finishPasskeyRegistration(
     deviceName: deviceName ?? null,
     createdAt: deps.now(),
     lastUsedAt: null,
-  });
+  };
+  if (input.commit) {
+    await input.commit({credential: verified, sessionHash: input.sessionHash!, now: deps.now,
+      ...(input.request !== undefined ? {request: input.request} : {}),
+    });
+  } else {insertPasskey(db, verified);}
 
   return { passkeyId: credentialId };
 }

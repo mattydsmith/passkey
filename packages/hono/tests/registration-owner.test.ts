@@ -37,6 +37,8 @@ describe("registration finish authenticated owner", () => {
         const result = await request("/auth/passkey/register/finish", body, headers);
         expect(result.status).toBe(200);
         expect(finish).toHaveBeenCalledWith(expect.objectContaining({ userId: "authenticated-owner", registrationId: "pending" }));
+        expect(finish.mock.calls[0]![0].request?.url).toBe("http://localhost/auth/passkey/register/finish");
+        expect(finish.mock.calls[0]![0].request?.bodyUsed).toBe(true);
         finish.mockClear();
         const denied = await request("/auth/passkey/register/finish", body);
         expect(denied.status).toBe(401);

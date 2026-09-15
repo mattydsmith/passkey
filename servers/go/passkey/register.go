@@ -3,6 +3,7 @@ package passkey
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -17,7 +18,7 @@ import (
 // authenticated session.
 func HandleRegisterStart(s storage.Storage, wa *webauthn.WebAuthn, pending *PendingRegistrations, cookieName string, now func() time.Time) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, err := auth.RequireSession(s, r, cookieName, now())
+		userID, sessionHash, err := auth.RequireSessionWithHash(s, r, cookieName, now())
 		if err != nil {
 			writeSessionError(w, err)
 			return
@@ -42,7 +43,7 @@ func HandleRegisterStart(s storage.Storage, wa *webauthn.WebAuthn, pending *Pend
 			writeJSONError(w, 500, "internal_error", err.Error())
 			return
 		}
-		pending.Put(regID, userID, *sessionData)
+		pending.PutForSession(regID, userID, sessionHash, *sessionData)
 		writeJSON(w, 200, map[string]any{
 			"registrationId": regID,
 			"options":        creation.Response,
@@ -51,14 +52,14 @@ func HandleRegisterStart(s storage.Storage, wa *webauthn.WebAuthn, pending *Pend
 }
 
 // HandleRegisterFinish completes a passkey registration ceremony.
-func HandleRegisterFinish(s storage.Storage, wa *webauthn.WebAuthn, pending *PendingRegistrations, cookieName string, now func() time.Time) http.HandlerFunc {
+func HandleRegisterFinish(s storage.Storage, wa *webauthn.WebAuthn, pending *PendingRegistrations, cookieName string, now func() time.Time, commit ...RegistrationCommit) http.HandlerFunc {
 	type req struct {
 		RegistrationID string          `json:"registrationId"`
 		Credential     json.RawMessage `json:"credential"`
 		DeviceName     *string         `json:"deviceName,omitempty"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, err := auth.RequireSession(s, r, cookieName, now())
+		userID, sessionHash, err := auth.RequireSessionWithHash(s, r, cookieName, now())
 		if err != nil {
 			writeSessionError(w, err)
 			return
@@ -68,7 +69,17 @@ func HandleRegisterFinish(s storage.Storage, wa *webauthn.WebAuthn, pending *Pen
 			writeJSONError(w, 400, "invalid_request", "bad body")
 			return
 		}
-		sess, ok := pending.TakeForUser(body.RegistrationID, userID)
+		var sess webauthn.SessionData
+		var ok bool
+		var host RegistrationCommit
+		if len(commit) > 0 {
+			host = commit[0]
+		}
+		if host != nil {
+			sess, ok = pending.TakeForSession(body.RegistrationID, userID, sessionHash)
+		} else {
+			sess, ok = pending.TakeForUser(body.RegistrationID, userID)
+		}
 		if !ok {
 			writeJSONError(w, 401, "invalid_credential", "Registration not available")
 			return
@@ -89,7 +100,7 @@ func HandleRegisterFinish(s storage.Storage, wa *webauthn.WebAuthn, pending *Pen
 			writeJSONError(w, 401, "invalid_credential", err.Error())
 			return
 		}
-		if err := s.CreatePasskey(storage.Passkey{
+		verified := storage.Passkey{
 			CredentialID:   cred.ID,
 			UserID:         userID,
 			PublicKey:      cred.PublicKey,
@@ -99,8 +110,20 @@ func HandleRegisterFinish(s storage.Storage, wa *webauthn.WebAuthn, pending *Pen
 			BackupEligible: cred.Flags.BackupEligible,
 			BackupState:    cred.Flags.BackupState,
 			CreatedAt:      now(),
-		}); err != nil {
-			writeJSONError(w, 500, "internal_error", err.Error())
+		}
+		if host != nil {
+			err = host(r.Context(), RegistrationInput{Credential: verified, SessionHash: sessionHash, Now: now, Request: r})
+		} else {
+			err = s.CreatePasskey(verified)
+		}
+		if err != nil {
+			if errors.Is(err, auth.ErrSessionUnavailable) {
+				writeSessionError(w, err)
+			} else if errors.Is(err, ErrSignInDenied) || errors.Is(err, auth.ErrUnauthenticated) {
+				writeJSONError(w, 401, "invalid_credential", "Registration not allowed")
+			} else {
+				writeJSONError(w, 500, "internal_error", "Registration failed")
+			}
 			return
 		}
 		writeJSON(w, 200, map[string]string{"passkeyId": CredIDToString(cred.ID)})
