@@ -52,3 +52,17 @@ export function deleteExpiredOtps(db: Db, cutoff: number): number {
     .run(cutoff);
   return result.changes;
 }
+
+/** Insert a fresh OTP into the caller's transaction after host delivery and
+ * eligibility checks. Does not begin/commit/rollback; consumedAt starts null. */
+export function createOtpInTransaction(db: Db, o: Omit<OtpRecord, "consumedAt">): void {
+  if (!db.inTransaction) throw new Error("OTP insertion requires transaction");
+  insertOtp(db, { ...o, consumedAt: null });
+}
+
+/** Invalidate older codes alongside host reservation/budget writes. The address
+ * must already be normalized and now sampled after acquiring the writer. */
+export function invalidateOtpsInTransaction(db: Db, email: string, now: number): number {
+  if (!db.inTransaction) throw new Error("OTP invalidation requires transaction");
+  return db.prepare("UPDATE auth_email_otps SET consumed_at=? WHERE email=? AND consumed_at IS NULL").run(now, email).changes;
+}

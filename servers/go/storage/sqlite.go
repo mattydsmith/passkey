@@ -164,7 +164,23 @@ func (s *sqliteStore) ListSessions(userID string) ([]Session, error) {
 func (s *sqliteStore) CreateOTP(o EmailOTP) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, err := s.db.Exec(
+	return insertSQLiteOTP(context.Background(), s.db, o)
+}
+
+// CreateSQLiteOTPInTx inserts a fresh hashed OTP within the caller's existing
+// SQLite transaction. It never begins, commits or rolls back the transaction.
+// Use it to join host activation/account checks with OTP insertion after mail.
+func CreateSQLiteOTPInTx(ctx context.Context, tx *sql.Tx, o EmailOTP) error {
+	if tx == nil {
+		return errors.New("OTP insertion requires transaction")
+	}
+	return insertSQLiteOTP(ctx, tx, o)
+}
+func insertSQLiteOTP(ctx context.Context, exec interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}, o EmailOTP) error {
+
+	_, err := exec.ExecContext(ctx,
 		`INSERT INTO auth_email_otps (id, email, code_hash, attempts, created_at, expires_at)
 		 VALUES (?, ?, ?, ?, ?, ?)`,
 		o.ID, o.Email, o.CodeHash, o.Attempts, o.CreatedAt.Unix(), o.ExpiresAt.Unix(),
@@ -420,4 +436,18 @@ func VerifySQLiteOTPInTx(ctx context.Context, tx *sql.Tx, id string, codeHash []
 		return OTPVerification{Rejection: ErrInvalidOTP}, nil
 	}
 	return OTPVerification{Email: email}, nil
+}
+
+// InvalidateSQLiteOTPsInTx consumes outstanding OTPs for an already-normalized
+// address in the caller's transaction. It does not sample time or commit. Hosts
+// can reserve a replacement/delivery budget and invalidate older codes together.
+func InvalidateSQLiteOTPsInTx(ctx context.Context, tx *sql.Tx, email string, at time.Time) (int64, error) {
+	if tx == nil {
+		return 0, errors.New("OTP invalidation requires transaction")
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE auth_email_otps SET consumed_at=? WHERE email=? AND consumed_at IS NULL`, at.Unix(), email)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

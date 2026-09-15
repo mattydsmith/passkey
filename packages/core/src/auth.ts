@@ -72,7 +72,17 @@ export function createAuth(config: AuthConfig, runtime: AuthRuntime) {
 
   return {
     config,
-    async startEmailOtp(input: { email: string }): Promise<OtpStartResult> {
+    async startEmailOtp(input: { email: string; request?: Request }): Promise<OtpStartResult> {
+      if (config.email.start) {
+        const result = await config.email.start({
+          email: input.email.trim().toLowerCase(), expirySeconds: otpExpiry,
+          now: deps.now, ...(input.request !== undefined ? { request: input.request } : {}),
+        });
+        if (typeof result?.otpId !== "string" || !result.otpId.trim()) {
+          throw new Error("email start hook returned empty OTP ID");
+        }
+        return { otpId: result.otpId, expiresInSeconds: otpExpiry };
+      }
       return startEmailOtp({
         db, deps,
         sendOtp: config.email.sendOtp,
