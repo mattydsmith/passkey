@@ -1,0 +1,3 @@
+ok  	github.com/mattydsmith/passkey/servers/go/auth	1.972s
+ok  	github.com/mattydsmith/passkey/servers/go/passkey	1.311s
+ok  	github.com/mattydsmith/passkey/servers/go/httpapi	11.962s

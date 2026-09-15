@@ -73,7 +73,7 @@ func Mount(r chi.Router, cfg Config) error {
 			r.Post("/passkey/register/start",
 				passkey.HandleRegisterStart(cfg.Storage, wa, pendingReg, cfg.SessionCookieName, cfg.Now))
 			r.Post("/passkey/register/finish",
-				passkey.HandleRegisterFinish(cfg.Storage, wa, pendingReg, cfg.SessionCookieName, cfg.Now))
+				passkey.HandleRegisterFinish(cfg.Storage, wa, pendingReg, cfg.SessionCookieName, cfg.Now, cfg.PasskeyRegistration))
 			r.Post("/passkey/sign-in/start",
 				passkey.HandleSignInStart(cfg.Storage, wa, pendingSign))
 			r.Post("/passkey/sign-in/finish",

@@ -1,6 +1,7 @@
 package passkey
 
 import (
+	"bytes"
 	"sync"
 
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -13,8 +14,9 @@ type PendingRegistrations struct {
 }
 
 type registration struct {
-	UserID  string
-	Session webauthn.SessionData
+	SessionHash []byte
+	UserID      string
+	Session     webauthn.SessionData
 }
 
 func NewPendingRegistrations() *PendingRegistrations {
@@ -45,6 +47,26 @@ func (p *PendingRegistrations) TakeForUser(id, userID string) (webauthn.SessionD
 	defer p.mu.Unlock()
 	r, ok := p.m[id]
 	if !ok || userID == "" || r.UserID != userID {
+		return webauthn.SessionData{}, false
+	}
+	delete(p.m, id)
+	return r.Session, true
+}
+
+// PutForSession retains the initiating verified session for host commit mode.
+func (p *PendingRegistrations) PutForSession(id, userID string, hash []byte, s webauthn.SessionData) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.m[id] = registration{UserID: userID, Session: s, SessionHash: append([]byte(nil), hash...)}
+}
+
+// TakeForSession additionally binds host-managed registration to its original
+// session. A fresh session on the same account cannot revive an old ceremony.
+func (p *PendingRegistrations) TakeForSession(id, userID string, hash []byte) (webauthn.SessionData, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	r, ok := p.m[id]
+	if !ok || userID == "" || r.UserID != userID || len(hash) == 0 || !bytes.Equal(r.SessionHash, hash) {
 		return webauthn.SessionData{}, false
 	}
 	delete(p.m, id)

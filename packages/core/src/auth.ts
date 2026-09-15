@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { Db } from "./db.js";
 import { defaultDeps, type Deps } from "./deps.js";
 import { AuthError } from "./errors.js";
@@ -71,6 +72,14 @@ export function createAuth(config: AuthConfig, runtime: AuthRuntime) {
     return null;
   }
 
+  function registrationSession(userId: string, request?: Request): Uint8Array {
+    const token = request ? readToken(request) : null;
+    if (!token || validateAndBumpSession({db,deps,sessionToken: token}).userId !== userId) {
+      throw new AuthError("unauthenticated", "Registration needs its authenticated session");
+    }
+    return new Uint8Array(createHash("sha256").update(token).digest());
+  }
+
   return {
     config,
     async startEmailOtp(input: { email: string; request?: Request }): Promise<OtpStartResult> {
@@ -128,9 +137,10 @@ export function createAuth(config: AuthConfig, runtime: AuthRuntime) {
       return { sessionToken, user };
     },
 
-    async beginPasskeyRegistration(args: { user: User }): Promise<BeginRegistrationResult> {
+    async beginPasskeyRegistration(args: { user: User; request?: Request }): Promise<BeginRegistrationResult> {
       return beginPasskeyRegistration({
         db, deps,
+        ...(config.passkey?.registrationCommit ? {sessionHash: registrationSession(args.user.id,args.request)} : {}),
         userId: args.user.id,
         userEmail: args.user.email,
         rpId: config.rpId,
@@ -140,13 +150,14 @@ export function createAuth(config: AuthConfig, runtime: AuthRuntime) {
     },
 
     async finishPasskeyRegistration(
-      args: Omit<FinishRegistrationInput, "db" | "deps" | "rpId" | "expectedOrigins">
+      args: Omit<FinishRegistrationInput, "db" | "deps" | "rpId" | "expectedOrigins" | "commit" | "sessionHash">
     ): Promise<FinishRegistrationResult> {
       return finishPasskeyRegistration({
         db, deps,
         rpId: config.rpId,
         expectedOrigins: config.origins,
         ...args,
+        ...(config.passkey?.registrationCommit ? {commit: config.passkey.registrationCommit, sessionHash: registrationSession(args.userId,args.request)} : {}),
       });
     },
 

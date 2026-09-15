@@ -114,9 +114,18 @@ export type PasskeySignIn = (input: VerifiedPasskeySignIn & {
   ip: string | null;
 }) => Promise<SignInResult>;
 
+/** Commit only after rechecking host eligibility and the initiating session in
+ * the same transaction as credential persistence. No default write on error. */
+export type PasskeyRegistrationCommit = (input: {
+ credential: PasskeyRecord;
+ sessionHash: Uint8Array;
+ now: () => number;
+ request?: Request;
+}) => Promise<void>;
+
 /** Full SDK config. */
 export interface AuthConfig {
-  passkey?: { signIn: PasskeySignIn };
+  passkey?: { signIn?: PasskeySignIn; registrationCommit?: PasskeyRegistrationCommit };
   rpId: string;
   origins: string[];
   session: {

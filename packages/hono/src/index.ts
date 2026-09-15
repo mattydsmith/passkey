@@ -124,7 +124,7 @@ export function mountAuthRoutes(app: Hono, auth: Auth, opts: MountOptions = {}) 
   app.post(`${prefix}/passkey/register/start`, async (c) => {
     try {
       const user = await auth.requireSession(c.req.raw, { cookieName });
-      const result = await auth.beginPasskeyRegistration({ user });
+      const result = await auth.beginPasskeyRegistration({ user, request: c.req.raw });
       return c.json(result);
     } catch (e) { return errorResponse(c, e); }
   });
@@ -135,6 +135,7 @@ export function mountAuthRoutes(app: Hono, auth: Auth, opts: MountOptions = {}) 
       const parsed = finishRegistrationSchema.parse(await c.req.json());
       const result = await auth.finishPasskeyRegistration({
         userId: user.id,
+        request: c.req.raw,
         registrationId: parsed.registrationId,
         credential: parsed.credential as any,
         ...(parsed.deviceName !== undefined ? { deviceName: parsed.deviceName } : {}),
