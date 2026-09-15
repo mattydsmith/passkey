@@ -1,3 +1,4 @@
+import { AuthError } from "../errors.js";
 import type { Db } from "../db.js";
 import type { SessionRecord } from "../types.js";
 
@@ -54,10 +55,11 @@ export function bumpSessionLastSeen(
   tokenHash: Uint8Array,
   now: number
 ): void {
-  db.prepare("UPDATE auth_sessions SET last_seen_at = ? WHERE token_hash = ?").run(
+  const result = db.prepare("UPDATE auth_sessions SET last_seen_at = ? WHERE token_hash = ?").run(
     now,
     tokenHash
   );
+  if (result.changes === 0) throw new AuthError("unauthenticated", "Session is missing or expired");
 }
 
 export function deleteSessionByTokenHash(db: Db, tokenHash: Uint8Array): void {

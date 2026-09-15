@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -11,6 +12,11 @@ import (
 
 // ErrUnauthenticated is returned when no valid session can be resolved.
 var ErrUnauthenticated = errors.New("unauthenticated")
+
+// ErrSessionUnavailable means session persistence failed. It is distinct from
+// an invalid credential: callers must not clear credentials or request sign-in.
+// The wrapped cause and operation remain available for diagnostics.
+var ErrSessionUnavailable = errors.New("session_unavailable")
 
 // CreateSession issues a fresh session for the given userID. Returns the
 // plaintext session token (caller is responsible for delivering it via header
@@ -43,14 +49,22 @@ func RequireSession(s storage.Storage, r *http.Request, cookieName string, now t
 		return "", ErrUnauthenticated
 	}
 	sess, err := s.GetSession(HashToken(token))
-	if err != nil {
+	if errors.Is(err, storage.ErrNotFound) {
 		return "", ErrUnauthenticated
+	}
+	if err != nil {
+		return "", fmt.Errorf("%w: lookup: %w", ErrSessionUnavailable, err)
 	}
 	// Treat now == ExpiresAt as expired (matches TS: `expiresAt <= now`).
 	if !now.Before(sess.ExpiresAt) {
 		return "", ErrUnauthenticated
 	}
-	_ = s.TouchSession(sess.TokenHash, now)
+	if err := s.TouchSession(sess.TokenHash, now); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return "", ErrUnauthenticated
+		}
+		return "", fmt.Errorf("%w: touch: %w", ErrSessionUnavailable, err)
+	}
 	return sess.UserID, nil
 }
 

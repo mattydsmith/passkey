@@ -22,7 +22,7 @@ func HandleListPasskeys(s storage.Storage, cookieName string, now func() time.Ti
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, err := auth.RequireSession(s, r, cookieName, now())
 		if err != nil {
-			writeJSONError(w, 401, "unauthenticated", "Authentication required")
+			writeSessionError(w, err)
 			return
 		}
 		pks, err := s.ListPasskeys(userID)
@@ -55,7 +55,7 @@ func HandleDeletePasskey(s storage.Storage, cookieName string, now func() time.T
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, err := auth.RequireSession(s, r, cookieName, now())
 		if err != nil {
-			writeJSONError(w, 401, "unauthenticated", "Authentication required")
+			writeSessionError(w, err)
 			return
 		}
 		idParam := chi.URLParam(r, "id")

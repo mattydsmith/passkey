@@ -98,11 +98,21 @@ func (s *sqliteStore) GetSession(tokenHash []byte) (*Session, error) {
 func (s *sqliteStore) TouchSession(tokenHash []byte, at time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, err := s.db.Exec(
+	result, err := s.db.Exec(
 		`UPDATE auth_sessions SET last_seen_at = ? WHERE token_hash = ?`,
 		at.Unix(), tokenHash,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *sqliteStore) DeleteSession(tokenHash []byte) error {

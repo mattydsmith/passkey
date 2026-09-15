@@ -30,6 +30,11 @@ function errorResponse(c: any, err: unknown) {
     return c.json({ error: "invalid_request", message: err.message }, 400);
   }
   if (AuthError.is(err)) {
+    if (err.code === "session_unavailable") {
+      console.error("Session unavailable:", err.cause);
+      c.header("Retry-After", "1");
+      return c.json(err.toJSON(), 503);
+    }
     const status =
       err.code === "unauthenticated" ? 401 :
       err.code === "rate_limited" ? 429 :
