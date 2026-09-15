@@ -63,6 +63,20 @@ export interface AasaInput {
   appIds: string[];
 }
 
+/** Host-owned complete email sign-in transaction. Sample now after taking the
+ * database write lock. Commit credential verification, eligibility and session
+ * insertion before returning. Rejections must retain wrong-attempt accounting.
+ * An error never falls back to the SDK's default issuer. */
+export type EmailSignIn = (input: {
+  otpId: string;
+  code: string;
+  lifetimeSeconds: number;
+  maxAttempts: number;
+  now: () => number;
+  userAgent: string | null;
+  ip: string | null;
+}) => Promise<SignInResult>;
+
 /** Full SDK config. */
 export interface AuthConfig {
   rpId: string;
@@ -78,6 +92,6 @@ export interface AuthConfig {
   webauthn?: {
     userVerification?: "required" | "preferred" | "discouraged";
   };
-  email: { sendOtp: SendOtp };
+  email: { sendOtp: SendOtp; signIn?: EmailSignIn };
   users: { findOrCreateByEmail: FindOrCreateByEmail };
 }
