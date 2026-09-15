@@ -27,7 +27,7 @@ func TestEmailIssuerMountedRoute(t *testing.T) {
 				GetOrCreateUserID: func(string) (string, error) { t.Fatal("legacy resolver called"); return "", nil },
 				EmailSignIn: func(ctx context.Context, in EmailSignInInput) (EmailSignInResult, error) {
 					calls++
-					if ctx.Value(key) != "request" || in.OTPID != "pending" || in.Code != "123456" || in.MaxAttempts != auth.OTPMaxAttempts || in.SessionTTL != 30*24*time.Hour || !in.Now().Equal(at) || in.UserAgent == nil || *in.UserAgent != "test-agent" || in.IP == nil || *in.IP != "192.0.2.1" {
+					if in.Request == nil || in.Request.RemoteAddr != "192.0.2.11:1234" || in.Request.Header.Get("X-Forwarded-For") != "192.0.2.1" || ctx.Value(key) != "request" || in.OTPID != "pending" || in.Code != "123456" || in.MaxAttempts != auth.OTPMaxAttempts || in.SessionTTL != 30*24*time.Hour || !in.Now().Equal(at) || in.UserAgent == nil || *in.UserAgent != "test-agent" || in.IP == nil || *in.IP != "192.0.2.1" {
 						t.Fatalf("input: %+v", in)
 					}
 					if mode == "failure" {
@@ -52,6 +52,7 @@ func TestEmailIssuerMountedRoute(t *testing.T) {
 			}
 			req := httptest.NewRequest("POST", "/auth/email/verify", strings.NewReader(`{"otpId":"pending","code":"`+code+`"}`))
 			req = req.WithContext(context.WithValue(req.Context(), key, "request"))
+			req.RemoteAddr = "192.0.2.11:1234"
 			req.Header.Set("User-Agent", "test-agent")
 			req.Header.Set("X-Forwarded-For", "192.0.2.1")
 			rec := httptest.NewRecorder()

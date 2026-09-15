@@ -75,7 +75,7 @@ export function createAuth(config: AuthConfig, runtime: AuthRuntime) {
     async startEmailOtp(input: { email: string; request?: Request }): Promise<OtpStartResult> {
       if (config.email.start) {
         const result = await config.email.start({
-          email: input.email.trim().toLowerCase(), expirySeconds: otpExpiry,
+          originalEmail: input.email, email: input.email.trim().toLowerCase(), expirySeconds: otpExpiry,
           now: deps.now, ...(input.request !== undefined ? { request: input.request } : {}),
         });
         if (typeof result?.otpId !== "string" || !result.otpId.trim()) {
@@ -92,6 +92,7 @@ export function createAuth(config: AuthConfig, runtime: AuthRuntime) {
     },
 
     async verifyEmailOtp(input: {
+      request?: Request;
       otpId: string;
       code: string;
       userAgent?: string;
@@ -100,6 +101,7 @@ export function createAuth(config: AuthConfig, runtime: AuthRuntime) {
       if (config.email.signIn) {
         const result = await config.email.signIn({
           otpId: input.otpId, code: input.code,
+          ...(input.request !== undefined ? { request: input.request } : {}),
           lifetimeSeconds: config.session.lifetimeSeconds, maxAttempts: otpMaxAttempts,
           now: deps.now, userAgent: input.userAgent ?? null, ip: input.ip ?? null,
         });

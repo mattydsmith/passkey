@@ -109,7 +109,7 @@ func handleEmailStart(cfg Config) http.HandlerFunc {
 			return
 		}
 		if cfg.EmailStart != nil {
-			result, err := cfg.EmailStart(r.Context(), EmailStartInput{Email: email, OTPTTL: cfg.OTPTTL, Now: cfg.Now, Request: r})
+			result, err := cfg.EmailStart(r.Context(), EmailStartInput{OriginalEmail: body.Email, Email: email, OTPTTL: cfg.OTPTTL, Now: cfg.Now, Request: r})
 			if err != nil {
 				writeError(w, err)
 				return
@@ -168,7 +168,7 @@ func handleEmailVerify(cfg Config) http.HandlerFunc {
 		if cfg.EmailSignIn != nil {
 			var result EmailSignInResult
 			result, err = cfg.EmailSignIn(r.Context(), EmailSignInInput{
-				OTPID: body.OTPID, Code: body.Code, SessionTTL: cfg.SessionTTL,
+				Request: r, OTPID: body.OTPID, Code: body.Code, SessionTTL: cfg.SessionTTL,
 				MaxAttempts: auth.OTPMaxAttempts, Now: cfg.Now, UserAgent: uap, IP: ipp,
 			})
 			token, userID, email = result.SessionToken, result.User.ID, result.User.Email

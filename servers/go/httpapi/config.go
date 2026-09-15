@@ -48,6 +48,9 @@ type Config struct {
 // EmailSignInInput contains validated request fields and the effective policy.
 // Now must be sampled after acquiring the transaction's database write lock.
 type EmailSignInInput struct {
+	// Request is metadata only; its body is already decoded. Legacy IP and
+	// forwarding headers are untrusted until the host establishes proxy trust.
+	Request       *http.Request
 	OTPID, Code   string
 	SessionTTL    time.Duration
 	MaxAttempts   int
@@ -71,10 +74,13 @@ type EmailSignInUser struct {
 // untrusted: the host must establish its own transport/proxy trust boundary.
 // Sample Now only after acquiring any database writer used by host policy.
 type EmailStartInput struct {
-	Email   string
-	OTPTTL  time.Duration
-	Now     func() time.Time
-	Request *http.Request
+	// OriginalEmail preserves input before trimming or Unicode case folding.
+	// Use it for policies that reject characters normalization would erase.
+	OriginalEmail string
+	Email         string
+	OTPTTL        time.Duration
+	Now           func() time.Time
+	Request       *http.Request
 }
 
 // EmailStartResult leaves the public lifetime fixed to the configured policy.

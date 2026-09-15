@@ -33,7 +33,7 @@ func TestEmailStartHookMounted(t *testing.T) {
 			cfg := Config{Storage: st, EmailSender: sender, RPID: "example.com", Origins: []string{"https://example.com"}, SessionCookieName: "session", OTPTTL: 15 * time.Minute, Now: func() time.Time { return now },
 				EmailStart: func(ctx context.Context, in EmailStartInput) (EmailStartResult, error) {
 					calls++
-					if in.Email != "user@example.com" || in.OTPTTL != 15*time.Minute || !in.Now().Equal(now) || ctx.Value(key) != "request" || in.Request.RemoteAddr != "192.0.2.11:1234" || in.Request.Header.Get("X-Forwarded-For") != "untrusted" {
+					if in.OriginalEmail != " USER@EXAMPLE.COM " || in.Email != "user@example.com" || in.OTPTTL != 15*time.Minute || !in.Now().Equal(now) || ctx.Value(key) != "request" || in.Request.RemoteAddr != "192.0.2.11:1234" || in.Request.Header.Get("X-Forwarded-For") != "untrusted" {
 						t.Fatal("incorrect hook input")
 					}
 					if mode == "error" {
@@ -75,6 +75,30 @@ func TestEmailStartHookMounted(t *testing.T) {
 			}
 			if mode == "success" && !strings.Contains(res.Body.String(), `"otpId":"opaque-host-id","expiresInSeconds":900`) {
 				t.Fatalf("body=%s", res.Body.String())
+			}
+		})
+	}
+}
+
+func TestEmailStartPreservesOriginalUnicode(t *testing.T) {
+	for _, email := range []string{" Kate@example.com ", " İan@example.com "} {
+		t.Run(email, func(t *testing.T) {
+			calls := 0
+			cfg := Config{Storage: &startStorageSpy{}, EmailStart: func(_ context.Context, in EmailStartInput) (EmailStartResult, error) {
+				calls++
+				if in.OriginalEmail != email || in.Email != strings.ToLower(strings.TrimSpace(email)) {
+					t.Fatal("original address lost before host policy")
+				}
+				return EmailStartResult{OTPID: "opaque"}, nil
+			}}
+			r := chi.NewRouter()
+			if e := Mount(r, cfg); e != nil {
+				t.Fatal(e)
+			}
+			out := httptest.NewRecorder()
+			r.ServeHTTP(out, httptest.NewRequest("POST", "/auth/email/start", strings.NewReader(`{"email":"`+email+`"}`)))
+			if out.Code != 200 || calls != 1 {
+				t.Fatalf("status=%d calls=%d", out.Code, calls)
 			}
 		})
 	}

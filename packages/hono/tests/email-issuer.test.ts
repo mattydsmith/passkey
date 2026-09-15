@@ -15,6 +15,9 @@ describe("host email issuer on mounted route", () => {
           calls++;
           expect(input).toMatchObject({ otpId: "pending", code: "123456", lifetimeSeconds: 3600, maxAttempts: 5, userAgent: "test-agent", ip: "192.0.2.1" });
           expect(input.now()).toBe(1700000000);
+expect(input.request?.url).toBe("http://localhost/auth/email/verify");
+expect(input.request?.headers.get("x-forwarded-for")).toBe("192.0.2.1");
+expect(input.request?.bodyUsed).toBe(true);
           if (mode === "failure") throw new Error("synthetic commit failure");
           if (mode === "rejection") throw new AuthError("otp_expired", "expired");
           if (mode === "empty") return { sessionToken: "", user: { id: "", email: "" } };
