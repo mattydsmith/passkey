@@ -1,0 +1,24 @@
+--- FAIL: TestRegistrationReadHTTP (0.03s)
+    --- FAIL: TestRegistrationReadHTTP/success/bearer (0.00s)
+        registration_read_test.go:108: status=200 host=0 default_reads=1; want 200/1/0
+    --- FAIL: TestRegistrationReadHTTP/success/cookie (0.00s)
+        registration_read_test.go:108: status=200 host=0 default_reads=1; want 200/1/0
+    --- FAIL: TestRegistrationReadHTTP/denied/bearer (0.00s)
+        registration_read_test.go:108: status=200 host=0 default_reads=1; want 401/1/0
+    --- FAIL: TestRegistrationReadHTTP/denied/cookie (0.00s)
+        registration_read_test.go:108: status=200 host=0 default_reads=1; want 401/1/0
+    --- FAIL: TestRegistrationReadHTTP/unavailable/bearer (0.00s)
+        registration_read_test.go:108: status=200 host=0 default_reads=1; want 503/1/0
+    --- FAIL: TestRegistrationReadHTTP/unavailable/cookie (0.00s)
+        registration_read_test.go:108: status=200 host=0 default_reads=1; want 503/1/0
+    --- FAIL: TestRegistrationReadHTTP/failure/bearer (0.00s)
+        registration_read_test.go:108: status=200 host=0 default_reads=1; want 503/1/0
+    --- FAIL: TestRegistrationReadHTTP/failure/cookie (0.00s)
+        registration_read_test.go:108: status=200 host=0 default_reads=1; want 503/1/0
+    --- FAIL: TestRegistrationReadHTTP/foreign/bearer (0.00s)
+        registration_read_test.go:108: status=200 host=0 default_reads=1; want 503/1/0
+    --- FAIL: TestRegistrationReadHTTP/foreign/cookie (0.00s)
+        registration_read_test.go:108: status=200 host=0 default_reads=1; want 503/1/0
+FAIL
+FAIL	github.com/mattydsmith/passkey/servers/go/httpapi	0.293s
+FAIL

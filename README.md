@@ -218,3 +218,25 @@ this option is configured; Hono forwards it automatically. Go
 `storage.CreateSQLitePasskeyInTx` preserves SDK field encoding while letting a
 host own the transaction. This extension does not itself implement a host
 account lifecycle or authorize registration-start data access.
+
+### Go host-owned registration-start snapshot
+
+Go `httpapi.Config.PasskeyRegistrationRead` optionally replaces the passkey-data
+read during registration start, after SDK session verification. The callback
+receives the verified user ID, a copy of the initiating session hash, the clock
+function and request. It must order current account/session/expiry checks and
+its returned passkey snapshot with revocation. `storage.ListSQLitePasskeysInTx`
+reads through a host-owned SQLite transaction without ending that transaction.
+
+Return `auth.ErrUnauthenticated` for an ineligible initiating session. Other
+failures, or returned rows belonging to another user, produce 503
+`session_unavailable` with `Retry-After: 1`. Refusal creates no pending ceremony
+and never falls back to the default storage read. The preliminary SDK session
+lookup/touch still occurs before this callback; it is not covered by the host
+snapshot transaction. Leaving the callback nil preserves existing behavior.
+
+The host's admission may win before a later revocation; a response or pending
+ceremony can then be created after that revocation. Final registration still
+needs `PasskeyRegistration` to recheck the initiating session and account at
+persistence. This optional Go integration changes no normal wire payload or
+TypeScript default behavior and does not itself implement account lifecycle.

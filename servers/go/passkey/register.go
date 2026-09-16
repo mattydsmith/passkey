@@ -16,17 +16,39 @@ import (
 
 // HandleRegisterStart begins a passkey registration ceremony. Requires an
 // authenticated session.
-func HandleRegisterStart(s storage.Storage, wa *webauthn.WebAuthn, pending *PendingRegistrations, cookieName string, now func() time.Time) http.HandlerFunc {
+func HandleRegisterStart(s storage.Storage, wa *webauthn.WebAuthn, pending *PendingRegistrations, cookieName string, now func() time.Time, read ...RegistrationRead) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, sessionHash, err := auth.RequireSessionWithHash(s, r, cookieName, now())
 		if err != nil {
 			writeSessionError(w, err)
 			return
 		}
-		u, err := loadUser(s, userID)
-		if err != nil {
-			writeJSONError(w, 500, "internal_error", "Failed to load user")
-			return
+		var u *sdkUser
+		if len(read) > 0 && read[0] != nil {
+			keys, readErr := read[0](r.Context(), RegistrationReadInput{UserID: userID, SessionHash: append([]byte(nil), sessionHash...), Now: now, Request: r})
+			if readErr == nil {
+				for _, key := range keys {
+					if key.UserID != userID {
+						readErr = auth.ErrSessionUnavailable
+						break
+					}
+				}
+			}
+			if readErr != nil {
+				if errors.Is(readErr, auth.ErrUnauthenticated) {
+					writeSessionError(w, auth.ErrUnauthenticated)
+				} else {
+					writeSessionError(w, auth.ErrSessionUnavailable)
+				}
+				return
+			}
+			u = userFromPasskeys(userID, keys)
+		} else {
+			u, err = loadUser(s, userID)
+			if err != nil {
+				writeJSONError(w, 500, "internal_error", "Failed to load user")
+				return
+			}
 		}
 		creation, sessionData, err := wa.BeginRegistration(u,
 			webauthn.WithAuthenticatorSelection(protocol.AuthenticatorSelection{
