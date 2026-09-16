@@ -15,6 +15,9 @@ import (
 // Config controls how Mount wires routes. All fields except Storage are
 // optional — defaults are applied in Mount.
 type Config struct {
+	// AccountManagement owns current admission and metadata reads/passkey deletion.
+	// Nil preserves the default SDK behavior.
+	AccountManagement auth.AccountManagement
 	// PasskeyRegistration commits a verified registration with host lifecycle and
 	// initiating-session checks. It must commit before success; no fallback.
 	PasskeyRegistration passkey.RegistrationCommit

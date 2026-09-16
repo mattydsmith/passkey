@@ -123,7 +123,10 @@ func (s *sqliteStore) DeleteSession(tokenHash []byte) error {
 }
 
 func (s *sqliteStore) ListSessions(userID string) ([]Session, error) {
-	rows, err := s.db.Query(
+	return listSQLiteSessions(context.Background(), s.db, userID)
+}
+func listSQLiteSessions(ctx context.Context, q sqliteRowsQuerier, userID string) ([]Session, error) {
+	rows, err := q.QueryContext(ctx,
 		`SELECT token_hash, user_id, created_at, expires_at, last_seen_at, user_agent, ip
 		 FROM auth_sessions WHERE user_id = ? ORDER BY created_at DESC`,
 		userID,
@@ -289,7 +292,10 @@ func (s *sqliteStore) GetPasskey(credentialID []byte) (*Passkey, error) {
 }
 
 func (s *sqliteStore) ListPasskeys(userID string) ([]Passkey, error) {
-	rows, err := s.db.Query(
+	return listSQLitePasskeys(context.Background(), s.db, userID)
+}
+func listSQLitePasskeys(ctx context.Context, q sqliteRowsQuerier, userID string) ([]Passkey, error) {
+	rows, err := q.QueryContext(ctx,
 		`SELECT credential_id, user_id, public_key, sign_count, transports, aaguid, device_name, backup_eligible, backup_state, created_at, last_used_at
 		 FROM auth_passkeys WHERE user_id = ? ORDER BY created_at DESC`,
 		userID,

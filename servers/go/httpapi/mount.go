@@ -13,6 +13,7 @@ import (
 
 	"github.com/mattydsmith/passkey/servers/go/auth"
 	"github.com/mattydsmith/passkey/servers/go/passkey"
+	"github.com/mattydsmith/passkey/servers/go/storage"
 )
 
 // emailLike is a deliberately loose check matching Zod's `.email()` posture
@@ -82,8 +83,8 @@ func Mount(r chi.Router, cfg Config) error {
 					cfg.SessionCookieName, cfg.CSRFCookieName, cfg.Now,
 					setSessionCookie, setCSRFCookie, cfg.PasskeySignIn,
 				))
-			r.Get("/passkeys", passkey.HandleListPasskeys(cfg.Storage, cfg.SessionCookieName, cfg.Now))
-			r.Delete("/passkeys/{id}", passkey.HandleDeletePasskey(cfg.Storage, cfg.SessionCookieName, cfg.Now))
+			r.Get("/passkeys", passkey.HandleListPasskeys(cfg.Storage, cfg.SessionCookieName, cfg.Now, cfg.AccountManagement))
+			r.Delete("/passkeys/{id}", passkey.HandleDeletePasskey(cfg.Storage, cfg.SessionCookieName, cfg.Now, cfg.AccountManagement))
 		}
 	})
 	return nil
@@ -208,10 +209,16 @@ func handleMe(cfg Config) http.HandlerFunc {
 		Email string `json:"email"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, err := auth.RequireSession(cfg.Storage, r, cfg.SessionCookieName, cfg.Now())
+		userID, hash, err := auth.RequireSessionWithHash(cfg.Storage, r, cfg.SessionCookieName, cfg.Now())
 		if err != nil {
 			writeError(w, err)
 			return
+		}
+		if cfg.AccountManagement != nil {
+			if _, err = auth.RunManagement(cfg.AccountManagement, r, userID, hash, cfg.Now, auth.ManagementMe, nil); err != nil {
+				writeError(w, err)
+				return
+			}
 		}
 		writeJSON(w, 200, map[string]respUser{"user": {ID: userID, Email: ""}})
 	}
@@ -240,12 +247,19 @@ func handleListSessions(cfg Config) http.HandlerFunc {
 		IP         string `json:"ip,omitempty"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, err := auth.RequireSession(cfg.Storage, r, cfg.SessionCookieName, cfg.Now())
+		userID, hash, err := auth.RequireSessionWithHash(cfg.Storage, r, cfg.SessionCookieName, cfg.Now())
 		if err != nil {
 			writeError(w, err)
 			return
 		}
-		sessions, err := cfg.Storage.ListSessions(userID)
+		var sessions []storage.Session
+		if cfg.AccountManagement != nil {
+			var result auth.ManagementResult
+			result, err = auth.RunManagement(cfg.AccountManagement, r, userID, hash, cfg.Now, auth.ManagementSessions, nil)
+			sessions = result.Sessions
+		} else {
+			sessions, err = cfg.Storage.ListSessions(userID)
+		}
 		if err != nil {
 			writeError(w, err)
 			return
