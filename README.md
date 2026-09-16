@@ -239,3 +239,25 @@ created afterward. Hosts requiring lifecycle safety must also configure
 `PasskeyRegistration` to recheck the initiating session and account at persistence.
 Mount does not enforce this pairing. This Go-only extension changes no default
 wire payload or TypeScript behavior and does not implement account lifecycle.
+
+### Go host-owned account management
+
+`httpapi.Config.AccountManagement` optionally owns current account/session
+admission together with `/auth/me`, session listing, passkey listing and owned
+passkey deletion. The callback receives the named operation, verified identity,
+copied initiating session hash, optional copied deletion ID, request and clock.
+Return the requested rows or complete the deletion only after your lifecycle
+transaction commits. A check followed by an unguarded read/write is insufficient.
+
+`auth.ErrUnauthenticated` becomes 401; deletion `storage.ErrNotFound` becomes
+404 `unknown_credential`. Other failures and foreign returned rows become 503
+`session_unavailable` with `Retry-After: 1`, without fallback or private error
+text. A nil callback preserves default SDK behavior. SDK SQLite transaction
+helpers share the default row decoders and retain the caller's transaction;
+owned deletion is constrained by both owner and credential ID.
+
+Initial SDK session lookup/touch is outside the host transaction. A winning
+snapshot may be delivered after later revocation; it was authorized when read.
+Ceremonies, sign-out, host account lifecycle and TypeScript host integration
+are outside this opt-in. Registration admission and final commit must still be
+configured independently where needed. Default HTTP/TypeScript behavior is unchanged.

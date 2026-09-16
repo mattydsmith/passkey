@@ -1,0 +1,64 @@
+--- FAIL: TestAccountManagementHTTP (0.10s)
+    --- FAIL: TestAccountManagementHTTP/me/success/bearer (0.00s)
+        management_test.go:144: status=200 host=0 want=200/1 body={"user":{"id":"owner","email":""}}
+    --- FAIL: TestAccountManagementHTTP/me/success/cookie (0.00s)
+        management_test.go:144: status=200 host=0 want=200/1 body={"user":{"id":"owner","email":""}}
+    --- FAIL: TestAccountManagementHTTP/me/denied/bearer (0.00s)
+        management_test.go:144: status=200 host=0 want=401/1 body={"user":{"id":"owner","email":""}}
+    --- FAIL: TestAccountManagementHTTP/me/denied/cookie (0.00s)
+        management_test.go:144: status=200 host=0 want=401/1 body={"user":{"id":"owner","email":""}}
+    --- FAIL: TestAccountManagementHTTP/me/failure/bearer (0.00s)
+        management_test.go:144: status=200 host=0 want=503/1 body={"user":{"id":"owner","email":""}}
+    --- FAIL: TestAccountManagementHTTP/me/failure/cookie (0.00s)
+        management_test.go:144: status=200 host=0 want=503/1 body={"user":{"id":"owner","email":""}}
+    --- FAIL: TestAccountManagementHTTP/sessions/success/bearer (0.00s)
+        management_test.go:144: status=200 host=0 want=200/1 body={"sessions":[{"createdAt":1789539257,"expiresAt":1789542857,"lastSeenAt":1789539257}]}
+    --- FAIL: TestAccountManagementHTTP/sessions/success/cookie (0.00s)
+        management_test.go:144: status=200 host=0 want=200/1 body={"sessions":[{"createdAt":1789539257,"expiresAt":1789542857,"lastSeenAt":1789539257}]}
+    --- FAIL: TestAccountManagementHTTP/sessions/denied/bearer (0.00s)
+        management_test.go:144: status=200 host=0 want=401/1 body={"sessions":[{"createdAt":1789539257,"expiresAt":1789542857,"lastSeenAt":1789539257}]}
+    --- FAIL: TestAccountManagementHTTP/sessions/denied/cookie (0.00s)
+        management_test.go:144: status=200 host=0 want=401/1 body={"sessions":[{"createdAt":1789539257,"expiresAt":1789542857,"lastSeenAt":1789539257}]}
+    --- FAIL: TestAccountManagementHTTP/sessions/failure/bearer (0.00s)
+        management_test.go:144: status=200 host=0 want=503/1 body={"sessions":[{"createdAt":1789539257,"expiresAt":1789542857,"lastSeenAt":1789539257}]}
+    --- FAIL: TestAccountManagementHTTP/sessions/failure/cookie (0.00s)
+        management_test.go:144: status=200 host=0 want=503/1 body={"sessions":[{"createdAt":1789539257,"expiresAt":1789542857,"lastSeenAt":1789539257}]}
+    --- FAIL: TestAccountManagementHTTP/sessions/foreign/bearer (0.00s)
+        management_test.go:144: status=200 host=0 want=503/1 body={"sessions":[{"createdAt":1789539257,"expiresAt":1789542857,"lastSeenAt":1789539257}]}
+    --- FAIL: TestAccountManagementHTTP/sessions/foreign/cookie (0.00s)
+        management_test.go:144: status=200 host=0 want=503/1 body={"sessions":[{"createdAt":1789539257,"expiresAt":1789542857,"lastSeenAt":1789539257}]}
+    --- FAIL: TestAccountManagementHTTP/passkeys/success/bearer (0.00s)
+        management_test.go:144: status=200 host=0 want=200/1 body={"passkeys":[{"id":"b3duZWQta2V5","deviceName":null,"createdAt":1789539257,"lastUsedAt":null,"transports":null}]}
+    --- FAIL: TestAccountManagementHTTP/passkeys/success/cookie (0.00s)
+        management_test.go:144: status=200 host=0 want=200/1 body={"passkeys":[{"id":"b3duZWQta2V5","deviceName":null,"createdAt":1789539257,"lastUsedAt":null,"transports":null}]}
+    --- FAIL: TestAccountManagementHTTP/passkeys/denied/bearer (0.00s)
+        management_test.go:144: status=200 host=0 want=401/1 body={"passkeys":[{"id":"b3duZWQta2V5","deviceName":null,"createdAt":1789539257,"lastUsedAt":null,"transports":null}]}
+    --- FAIL: TestAccountManagementHTTP/passkeys/denied/cookie (0.00s)
+        management_test.go:144: status=200 host=0 want=401/1 body={"passkeys":[{"id":"b3duZWQta2V5","deviceName":null,"createdAt":1789539257,"lastUsedAt":null,"transports":null}]}
+    --- FAIL: TestAccountManagementHTTP/passkeys/failure/bearer (0.00s)
+        management_test.go:144: status=200 host=0 want=503/1 body={"passkeys":[{"id":"b3duZWQta2V5","deviceName":null,"createdAt":1789539257,"lastUsedAt":null,"transports":null}]}
+    --- FAIL: TestAccountManagementHTTP/passkeys/failure/cookie (0.00s)
+        management_test.go:144: status=200 host=0 want=503/1 body={"passkeys":[{"id":"b3duZWQta2V5","deviceName":null,"createdAt":1789539257,"lastUsedAt":null,"transports":null}]}
+    --- FAIL: TestAccountManagementHTTP/passkeys/foreign/bearer (0.00s)
+        management_test.go:144: status=200 host=0 want=503/1 body={"passkeys":[{"id":"b3duZWQta2V5","deviceName":null,"createdAt":1789539257,"lastUsedAt":null,"transports":null}]}
+    --- FAIL: TestAccountManagementHTTP/passkeys/foreign/cookie (0.00s)
+        management_test.go:144: status=200 host=0 want=503/1 body={"passkeys":[{"id":"b3duZWQta2V5","deviceName":null,"createdAt":1789539257,"lastUsedAt":null,"transports":null}]}
+    --- FAIL: TestAccountManagementHTTP/delete_passkey/success/bearer (0.00s)
+        management_test.go:144: status=200 host=0 want=200/1 body={"ok":true}
+    --- FAIL: TestAccountManagementHTTP/delete_passkey/success/cookie (0.00s)
+        management_test.go:144: status=200 host=0 want=200/1 body={"ok":true}
+    --- FAIL: TestAccountManagementHTTP/delete_passkey/denied/bearer (0.00s)
+        management_test.go:144: status=200 host=0 want=401/1 body={"ok":true}
+    --- FAIL: TestAccountManagementHTTP/delete_passkey/denied/cookie (0.00s)
+        management_test.go:144: status=200 host=0 want=401/1 body={"ok":true}
+    --- FAIL: TestAccountManagementHTTP/delete_passkey/failure/bearer (0.00s)
+        management_test.go:144: status=200 host=0 want=503/1 body={"ok":true}
+    --- FAIL: TestAccountManagementHTTP/delete_passkey/failure/cookie (0.00s)
+        management_test.go:144: status=200 host=0 want=503/1 body={"ok":true}
+    --- FAIL: TestAccountManagementHTTP/delete_passkey/not-found/bearer (0.00s)
+        management_test.go:144: status=200 host=0 want=404/1 body={"ok":true}
+    --- FAIL: TestAccountManagementHTTP/delete_passkey/not-found/cookie (0.00s)
+        management_test.go:144: status=200 host=0 want=404/1 body={"ok":true}
+FAIL
+FAIL	github.com/mattydsmith/passkey/servers/go/httpapi	0.356s
+FAIL
