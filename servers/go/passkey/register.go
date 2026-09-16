@@ -16,17 +16,31 @@ import (
 
 // HandleRegisterStart begins a passkey registration ceremony. Requires an
 // authenticated session.
-func HandleRegisterStart(s storage.Storage, wa *webauthn.WebAuthn, pending *PendingRegistrations, cookieName string, now func() time.Time) http.HandlerFunc {
+func HandleRegisterStart(s storage.Storage, wa *webauthn.WebAuthn, pending *PendingRegistrations, cookieName string, now func() time.Time, admit ...RegistrationStart) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, sessionHash, err := auth.RequireSessionWithHash(s, r, cookieName, now())
 		if err != nil {
 			writeSessionError(w, err)
 			return
 		}
-		u, err := loadUser(s, userID)
-		if err != nil {
-			writeJSONError(w, 500, "internal_error", "Failed to load user")
-			return
+		var u *sdkUser
+		if len(admit) > 0 && admit[0] != nil {
+			err = admit[0](r.Context(), RegistrationStartInput{UserID: userID, SessionHash: append([]byte(nil), sessionHash...), Now: now, Request: r})
+			if err != nil {
+				if !errors.Is(err, auth.ErrUnauthenticated) {
+					err = auth.ErrSessionUnavailable
+				}
+				writeSessionError(w, err)
+				return
+			}
+			// BeginRegistration uses identity only; existing keys are not needed.
+			u = &sdkUser{id: userID}
+		} else {
+			u, err = loadUser(s, userID)
+			if err != nil {
+				writeJSONError(w, 500, "internal_error", "Failed to load user")
+				return
+			}
 		}
 		creation, sessionData, err := wa.BeginRegistration(u,
 			webauthn.WithAuthenticatorSelection(protocol.AuthenticatorSelection{

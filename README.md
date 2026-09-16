@@ -218,3 +218,24 @@ this option is configured; Hono forwards it automatically. Go
 `storage.CreateSQLitePasskeyInTx` preserves SDK field encoding while letting a
 host own the transaction. This extension does not itself implement a host
 account lifecycle or authorize registration-start data access.
+
+### Go host-owned registration-start admission
+
+Go `httpapi.Config.PasskeyRegistrationStart` optionally admits registration
+start after SDK session verification. The callback receives the verified user
+ID, a copy of the initiating session hash, the clock function and request. The
+host must order current account/session/expiry checks with revocation.
+Configured mode uses the verified identity to create options without reading
+existing passkeys: WebAuthn registration start does not need those rows.
+
+Return `auth.ErrUnauthenticated` for an ineligible initiating session. Other
+failures produce 503 `session_unavailable` with `Retry-After: 1`. Refusal creates
+no pending ceremony and never falls back to the default storage read. The
+preliminary SDK session lookup/touch still occurs before this callback; it is
+outside the host admission transaction. A nil callback preserves existing behavior.
+
+Admission can win before a later revocation, with the response or pending ceremony
+created afterward. Hosts requiring lifecycle safety must also configure
+`PasskeyRegistration` to recheck the initiating session and account at persistence.
+Mount does not enforce this pairing. This Go-only extension changes no default
+wire payload or TypeScript behavior and does not implement account lifecycle.
