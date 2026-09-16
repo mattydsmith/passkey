@@ -71,7 +71,7 @@ func Mount(r chi.Router, cfg Config) error {
 			pendingReg := passkey.NewPendingRegistrations()
 			pendingSign := passkey.NewPendingSignIns()
 			r.Post("/passkey/register/start",
-				passkey.HandleRegisterStart(cfg.Storage, wa, pendingReg, cfg.SessionCookieName, cfg.Now, cfg.PasskeyRegistrationRead))
+				passkey.HandleRegisterStart(cfg.Storage, wa, pendingReg, cfg.SessionCookieName, cfg.Now, cfg.PasskeyRegistrationStart))
 			r.Post("/passkey/register/finish",
 				passkey.HandleRegisterFinish(cfg.Storage, wa, pendingReg, cfg.SessionCookieName, cfg.Now, cfg.PasskeyRegistration))
 			r.Post("/passkey/sign-in/start",

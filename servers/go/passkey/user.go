@@ -23,10 +23,6 @@ func loadUser(s storage.Storage, userID string) (*sdkUser, error) {
 	if err != nil {
 		return nil, err
 	}
-	return userFromPasskeys(userID, pks), nil
-}
-
-func userFromPasskeys(userID string, pks []storage.Passkey) *sdkUser {
 	u := &sdkUser{id: userID}
 	for _, p := range pks {
 		u.creds = append(u.creds, webauthn.Credential{
@@ -47,5 +43,5 @@ func userFromPasskeys(userID string, pks []storage.Passkey) *sdkUser {
 			},
 		})
 	}
-	return u
+	return u, nil
 }

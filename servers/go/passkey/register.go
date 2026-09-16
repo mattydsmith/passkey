@@ -16,7 +16,7 @@ import (
 
 // HandleRegisterStart begins a passkey registration ceremony. Requires an
 // authenticated session.
-func HandleRegisterStart(s storage.Storage, wa *webauthn.WebAuthn, pending *PendingRegistrations, cookieName string, now func() time.Time, read ...RegistrationRead) http.HandlerFunc {
+func HandleRegisterStart(s storage.Storage, wa *webauthn.WebAuthn, pending *PendingRegistrations, cookieName string, now func() time.Time, admit ...RegistrationStart) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, sessionHash, err := auth.RequireSessionWithHash(s, r, cookieName, now())
 		if err != nil {
@@ -24,25 +24,17 @@ func HandleRegisterStart(s storage.Storage, wa *webauthn.WebAuthn, pending *Pend
 			return
 		}
 		var u *sdkUser
-		if len(read) > 0 && read[0] != nil {
-			keys, readErr := read[0](r.Context(), RegistrationReadInput{UserID: userID, SessionHash: append([]byte(nil), sessionHash...), Now: now, Request: r})
-			if readErr == nil {
-				for _, key := range keys {
-					if key.UserID != userID {
-						readErr = auth.ErrSessionUnavailable
-						break
-					}
+		if len(admit) > 0 && admit[0] != nil {
+			err = admit[0](r.Context(), RegistrationStartInput{UserID: userID, SessionHash: append([]byte(nil), sessionHash...), Now: now, Request: r})
+			if err != nil {
+				if !errors.Is(err, auth.ErrUnauthenticated) {
+					err = auth.ErrSessionUnavailable
 				}
-			}
-			if readErr != nil {
-				if errors.Is(readErr, auth.ErrUnauthenticated) {
-					writeSessionError(w, auth.ErrUnauthenticated)
-				} else {
-					writeSessionError(w, auth.ErrSessionUnavailable)
-				}
+				writeSessionError(w, err)
 				return
 			}
-			u = userFromPasskeys(userID, keys)
+			// BeginRegistration uses identity only; existing keys are not needed.
+			u = &sdkUser{id: userID}
 		} else {
 			u, err = loadUser(s, userID)
 			if err != nil {

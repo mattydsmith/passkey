@@ -289,24 +289,7 @@ func (s *sqliteStore) GetPasskey(credentialID []byte) (*Passkey, error) {
 }
 
 func (s *sqliteStore) ListPasskeys(userID string) ([]Passkey, error) {
-	return listSQLitePasskeys(context.Background(), s.db, userID)
-}
-
-// ListSQLitePasskeysInTx reads the host transaction's snapshot. The host owns
-// admission and transaction lifetime; this helper neither commits nor rolls back.
-func ListSQLitePasskeysInTx(ctx context.Context, tx *sql.Tx, userID string) ([]Passkey, error) {
-	if tx == nil {
-		return nil, errors.New("passkey read requires transaction")
-	}
-	return listSQLitePasskeys(ctx, tx, userID)
-}
-
-type passkeyQueryer interface {
-	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
-}
-
-func listSQLitePasskeys(ctx context.Context, q passkeyQueryer, userID string) ([]Passkey, error) {
-	rows, err := q.QueryContext(ctx,
+	rows, err := s.db.Query(
 		`SELECT credential_id, user_id, public_key, sign_count, transports, aaguid, device_name, backup_eligible, backup_state, created_at, last_used_at
 		 FROM auth_passkeys WHERE user_id = ? ORDER BY created_at DESC`,
 		userID,

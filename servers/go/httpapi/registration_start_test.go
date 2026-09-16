@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -17,18 +18,18 @@ import (
 	"github.com/mattydsmith/passkey/servers/go/storage"
 )
 
-type registrationReadStorage struct {
+type registrationStartStorage struct {
 	storage.Storage
 	reads int
 }
 
-func (s *registrationReadStorage) ListPasskeys(id string) ([]storage.Passkey, error) {
+func (s *registrationStartStorage) ListPasskeys(id string) ([]storage.Passkey, error) {
 	s.reads++
 	return s.Storage.ListPasskeys(id)
 }
 
-func TestRegistrationReadHTTP(t *testing.T) {
-	for _, mode := range []string{"default", "success", "denied", "unavailable", "failure", "foreign", "missing-session"} {
+func TestRegistrationStartHTTP(t *testing.T) {
+	for _, mode := range []string{"default", "success", "denied", "unavailable", "failure", "missing-session"} {
 		for _, cookie := range []bool{false, true} {
 			t.Run(mode+map[bool]string{false: "/bearer", true: "/cookie"}[cookie], func(t *testing.T) {
 				raw, err := storage.OpenSQLite(filepath.Join(t.TempDir(), "auth.db"))
@@ -36,34 +37,32 @@ func TestRegistrationReadHTTP(t *testing.T) {
 					t.Fatal(err)
 				}
 				defer raw.Close()
-				s := &registrationReadStorage{Storage: raw}
+				s := &registrationStartStorage{Storage: raw}
 				at := time.Now()
 				token, err := auth.CreateSession(s, "owner", time.Hour, at, nil, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
-				cfg := Config{Storage: s, RPID: "example.com", RPName: "Snapshot test", Origins: []string{"https://example.com"}, Now: func() time.Time { return at }}
+				cfg := Config{Storage: s, RPID: "example.com", RPName: "Admission test", Origins: []string{"https://example.com"}, Now: func() time.Time { return at }}
 				if cookie {
 					cfg.SessionCookieName = "session"
 				}
 				calls := 0
 				if mode != "default" {
-					cfg.PasskeyRegistrationRead = func(ctx context.Context, in passkey.RegistrationReadInput) ([]storage.Passkey, error) {
+					cfg.PasskeyRegistrationStart = func(ctx context.Context, in passkey.RegistrationStartInput) error {
 						calls++
 						if ctx != in.Request.Context() || in.UserID != "owner" || !bytes.Equal(in.SessionHash, auth.HashToken(token)) || !in.Now().Equal(at) {
 							t.Fatal("missing host identity/session/request/clock")
 						}
 						switch mode {
 						case "denied":
-							return nil, auth.ErrUnauthenticated
+							return auth.ErrUnauthenticated
 						case "unavailable":
-							return nil, auth.ErrSessionUnavailable
+							return auth.ErrSessionUnavailable
 						case "failure":
-							return nil, errors.New("private read details")
-						case "foreign":
-							return []storage.Passkey{{UserID: "other", CredentialID: []byte("foreign")}}, nil
+							return errors.New("private read details")
 						}
-						return nil, nil
+						return nil
 					}
 				}
 				router := chi.NewRouter()
@@ -96,7 +95,7 @@ func TestRegistrationReadHTTP(t *testing.T) {
 					if mode == "missing-session" {
 						wantCalls = 0
 					}
-				case "unavailable", "failure", "foreign":
+				case "unavailable", "failure":
 					status = 503
 					code = "session_unavailable"
 				}
@@ -110,6 +109,11 @@ func TestRegistrationReadHTTP(t *testing.T) {
 				if status == 200 {
 					if body["registrationId"] == nil || body["options"] == nil {
 						t.Fatal("missing admitted ceremony")
+					}
+					options := body["options"].(map[string]any)
+					user := options["user"].(map[string]any)
+					if user["id"] != base64.RawURLEncoding.EncodeToString([]byte("owner")) || user["name"] != "owner" || user["displayName"] != "owner" || options["challenge"] == "" {
+						t.Fatalf("wrong admitted identity/options: %v", options)
 					}
 				} else {
 					if body["error"] != code || body["registrationId"] != nil || body["options"] != nil {

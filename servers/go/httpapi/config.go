@@ -18,9 +18,9 @@ type Config struct {
 	// PasskeyRegistration commits a verified registration with host lifecycle and
 	// initiating-session checks. It must commit before success; no fallback.
 	PasskeyRegistration passkey.RegistrationCommit
-	// PasskeyRegistrationRead optionally owns start-side account/session admission
-	// and the passkey snapshot. Nil retains the default SDK read behavior.
-	PasskeyRegistrationRead passkey.RegistrationRead
+	// PasskeyRegistrationStart optionally owns start-side account/session admission.
+	// Configured mode needs no passkey data read; nil retains default behavior.
+	PasskeyRegistrationStart passkey.RegistrationStart
 	// PasskeySignIn owns eligibility, credential recheck, counter update and session
 	// commit after successful WebAuthn verification. Never falls back on error.
 	PasskeySignIn     passkey.SignInIssuer

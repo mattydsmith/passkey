@@ -11,12 +11,13 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"github.com/mattydsmith/passkey/servers/go/passkey"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/mattydsmith/passkey/servers/go/passkey"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-webauthn/webauthn/protocol/webauthncbor"
@@ -50,6 +51,12 @@ func TestRegistrationCommitHTTP(t *testing.T) {
 					}
 					calls := 0
 					if mode != "default" {
+						cfg.PasskeyRegistrationStart = func(ctx context.Context, in passkey.RegistrationStartInput) error {
+							if in.UserID != "owner" || !bytes.Equal(in.SessionHash, auth.HashToken(tokens["owner"])) {
+								t.Fatal("wrong start admission")
+							}
+							return nil
+						}
 						cfg.PasskeyRegistration = func(ctx context.Context, in passkey.RegistrationInput) error {
 							calls++
 							if ctx != in.Request.Context() || in.Credential.UserID != "owner" || !bytes.Equal(in.SessionHash, auth.HashToken(tokens["owner"])) || !in.Now().Equal(at) || len(in.Credential.PublicKey) == 0 || len(in.Credential.CredentialID) == 0 {

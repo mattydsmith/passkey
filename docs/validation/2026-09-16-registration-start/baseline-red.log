@@ -1,0 +1,20 @@
+--- FAIL: TestRegistrationStartHTTP (0.03s)
+    --- FAIL: TestRegistrationStartHTTP/success/bearer (0.00s)
+        registration_start_test.go:106: status=200 host=0 default_reads=1; want 200/1/0
+    --- FAIL: TestRegistrationStartHTTP/success/cookie (0.00s)
+        registration_start_test.go:106: status=200 host=0 default_reads=1; want 200/1/0
+    --- FAIL: TestRegistrationStartHTTP/denied/bearer (0.00s)
+        registration_start_test.go:106: status=200 host=0 default_reads=1; want 401/1/0
+    --- FAIL: TestRegistrationStartHTTP/denied/cookie (0.00s)
+        registration_start_test.go:106: status=200 host=0 default_reads=1; want 401/1/0
+    --- FAIL: TestRegistrationStartHTTP/unavailable/bearer (0.00s)
+        registration_start_test.go:106: status=200 host=0 default_reads=1; want 503/1/0
+    --- FAIL: TestRegistrationStartHTTP/unavailable/cookie (0.00s)
+        registration_start_test.go:106: status=200 host=0 default_reads=1; want 503/1/0
+    --- FAIL: TestRegistrationStartHTTP/failure/bearer (0.00s)
+        registration_start_test.go:106: status=200 host=0 default_reads=1; want 503/1/0
+    --- FAIL: TestRegistrationStartHTTP/failure/cookie (0.00s)
+        registration_start_test.go:106: status=200 host=0 default_reads=1; want 503/1/0
+FAIL
+FAIL	github.com/mattydsmith/passkey/servers/go/httpapi	0.236s
+FAIL
